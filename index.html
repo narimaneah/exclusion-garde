@@ -353,7 +353,7 @@ details.rep > summary::-webkit-details-marker{display:none}
 <div class="mbar" id="mbar"><span class="pill idle" id="mbarPill">En cours de saisie</span><a href="#verdict" class="linkbtn">Voir la recommandation</a></div>
 
 <script>
-/* ===== CONFIGURATION — à remplir par l'équipe web / TI =====
+/* ===== CONFIGURATION =====
    submitUrl      : adresse qui reçoit chaque signalement (requête POST, corps JSON).
                     Exemples : déclencheur HTTP Power Automate, Microsoft Forms/SharePoint via flux,
                     API interne. Laisser vide = pas d'envoi; le milieu copie le résumé.
@@ -363,8 +363,8 @@ details.rep > summary::-webkit-details-marker{display:none}
    supabaseKey    : clé publique du projet (Publishable key ou anon key). JAMAIS la clé secrète / service_role.
                     Si ces deux champs sont remplis, chaque signalement envoyé est enregistré dans la base de données. */
 window.EXCLUSION_CONFIG = {
-  supabaseUrl: "",
-  supabaseKey: "",
+  supabaseUrl: "https://ahcsofbwujovaufqlkel.supabase.co",
+  supabaseKey: "sb_publishable_F-Hwo69WjCWpi314gorjJw_Aw63o8q9",
   supabaseTable: "signalements",
   submitUrl: "",
   contentType: "application/json",
