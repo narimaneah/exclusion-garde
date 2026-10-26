@@ -353,7 +353,10 @@ details.rep > summary::-webkit-details-marker{display:none}
 <div class="mbar" id="mbar"><span class="pill idle" id="mbarPill">En cours de saisie</span><a href="#verdict" class="linkbtn">Voir la recommandation</a></div>
 
 <script>
-/* ===== CONFIGURATION =====
+/* ===== CONFIGURATION — à remplir par l'équipe web / TI =====
+   formsPrefillUrl: lien prérempli Microsoft Forms (bouton « Obtenir l'URL préremplie »),
+                    créé en inscrivant MILIEU, TEL, RECO, RESUME et BRIGADE dans les réponses.
+                    Rempli = « Envoyer » ouvre ce formulaire avec toutes les réponses déjà inscrites.
    submitUrl      : adresse qui reçoit chaque signalement (requête POST, corps JSON).
                     Exemples : déclencheur HTTP Power Automate, Microsoft Forms/SharePoint via flux,
                     API interne. Laisser vide = pas d'envoi; le milieu copie le résumé.
@@ -363,8 +366,9 @@ details.rep > summary::-webkit-details-marker{display:none}
    supabaseKey    : clé publique du projet (Publishable key ou anon key). JAMAIS la clé secrète / service_role.
                     Si ces deux champs sont remplis, chaque signalement envoyé est enregistré dans la base de données. */
 window.EXCLUSION_CONFIG = {
-  supabaseUrl: "https://ahcsofbwujovaufqlkel.supabase.co",
-  supabaseKey: "sb_publishable_F-Hwo69WjCWpi314gorjJw_Aw63o8q9",
+  formsPrefillUrl: "",
+  supabaseUrl: "",
+  supabaseKey: "",
   supabaseTable: "signalements",
   submitUrl: "",
   contentType: "application/json",
@@ -373,14 +377,16 @@ window.EXCLUSION_CONFIG = {
 /* ===== BRIGADES — une ligne par brigade =====
    code : court identifiant utilisé dans le lien (…/?brigade=12)
    nom  : nom affiché ;  territoire : facultatif (CLSC, quartier…)
-   Exemple : { code: "12", nom: "Brigade Centre-Sud", territoire: "CLSC des Faubourgs" },
+   form : facultatif — lien prérempli du formulaire Microsoft Forms PROPRE à cette brigade.
+          Si absent, le formulaire général (formsPrefillUrl) est utilisé.
+   Exemple : { code: "12", nom: "Brigade Centre-Sud", territoire: "CLSC des Faubourgs", form: "" },
    Laisser la liste vide = champ texte libre. */
 window.EXCLUSION_BRIGADES = [
 ];
 </script>
 <script>
 (function(){
-const CONFIG = Object.assign({supabaseUrl:'',supabaseKey:'',supabaseTable:'signalements',submitUrl:'',contentType:'application/json',contactBrigade:''}, window.EXCLUSION_CONFIG||{});
+const CONFIG = Object.assign({formsPrefillUrl:'',supabaseUrl:'',supabaseKey:'',supabaseTable:'signalements',submitUrl:'',contentType:'application/json',contactBrigade:''}, window.EXCLUSION_CONFIG||{});
 const DB_ON = !!(CONFIG.supabaseUrl && CONFIG.supabaseKey);
 const newSession = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2,12);
 let SESSION = newSession();
@@ -643,6 +649,34 @@ $('#copyBtn').addEventListener('click', e=>{ const {f,ev}=refresh(); copyText(su
 
 /* ---------- base de données (Supabase) ---------- */
 const isExample = f => (f.notes||'').startsWith('EXEMPLE');
+
+/* ---------- Microsoft Forms (lien prérempli) ---------- */
+function formsBaseFor(code){
+  const b = BRIGADES.find(x=>String(x.code)===String(code||''));
+  return (b && b.form) || CONFIG.formsPrefillUrl || '';
+}
+function formsUrlFor(rec){
+  const base = formsBaseFor(rec.milieu.brigade); if(!base) return '';
+  const values = {
+    MILIEU: `${rec.milieu.nom}${rec.milieu.type?' ('+rec.milieu.type+')':''}${rec.milieu.contact?' – '+rec.milieu.contact:''}`,
+    TEL: rec.milieu.tel || '',
+    RECO: PILL[rec.verdict.state][1] + (rec.priorite==='MADO' ? ' – PRIORITÉ MADO' : ''),
+    RESUME: summary(rec).slice(0, 3800),
+    BRIGADE: rec.milieu.brigade ? brigadeLabel(rec.milieu.brigade) : ''
+  };
+  const qi = base.indexOf('?'); if(qi<0) return base;
+  let hits = 0;
+  const parts = base.slice(qi+1).split('&').map(part=>{
+    const i = part.indexOf('='); if(i<0) return part;
+    let raw; try{ raw = decodeURIComponent(part.slice(i+1).replace(/\+/g,' ')); }catch(e){ return part; }
+    const quoted = /^".*"$/.test(raw); const key = raw.replace(/^"|"$/g,'').trim().toUpperCase();
+    if(!(key in values)) return part;
+    hits++; const v = values[key];
+    return part.slice(0,i+1) + encodeURIComponent(quoted ? `"${v}"` : v);
+  });
+  return hits ? base.slice(0,qi+1) + parts.join('&') : base;
+}
+
 async function dbSave(rec, envoye){
   const row = {
     session_id: rec.id, envoye: !!envoye,
@@ -667,6 +701,13 @@ form.addEventListener('submit', async e=>{
   const rec = record(f, ev);
   const contact = CONFIG.contactBrigade ? `<p>Brigade : <b>${esc(CONFIG.contactBrigade)}</b></p>` : '';
   if(isExample(f)){ lastSent = `<div class="sent"><h3>Exemple</h3><p>Ceci est une fiche d'exemple : rien n'a été envoyé ni enregistré.</p></div>`; refresh(); return; }
+  const fUrl = formsUrlFor(rec);
+  if(fUrl){
+    const w = window.open(fUrl, '_blank', 'noopener');
+    lastSent = `<div class="sent"><h3>Dernière étape : confirmez dans le formulaire</h3><p>${w===null?'':'Le formulaire de la brigade s\'est ouvert dans un nouvel onglet. '}Toutes vos réponses y sont déjà inscrites. Vérifiez-les, puis cliquez sur <b>« Envoyer »</b> au bas du formulaire. Le signalement n'est transmis qu'à ce moment.</p><p><a class="btn primary" style="display:inline-block;text-decoration:none" href="${esc(fUrl)}" target="_blank" rel="noopener">Ouvrir le formulaire</a></p></div>`;
+    refresh(); $('#verdict').scrollIntoView({block:'start'});
+    return;
+  }
   if(DB_ON){
     const btn=$('#submitBtn'); btn.disabled=true; btn.textContent='Envoi…';
     try{ await dbSave(rec, true);
@@ -714,7 +755,8 @@ $('#exampleBtn').addEventListener('click', ()=>{
 
 /* ---------- boot ---------- */
 fillDiag(); setupBrigade(); loadMilieu(); refresh();
-if(DB_ON){ const o=$('#offline'); o.hidden=false; o.textContent = "Quand vous cliquez sur « Envoyer à la brigade », vos réponses sont enregistrées pour la santé publique. Aucun nom d'enfant n'est demandé."; }
+if(CONFIG.formsPrefillUrl || BRIGADES.some(b=>b.form)){ const o=$('#offline'); o.hidden=false; o.textContent = "Après avoir répondu, cliquez sur « Envoyer à la brigade » : un formulaire déjà rempli s'ouvrira. Il suffira de cliquer sur « Envoyer » au bas du formulaire. Aucun nom d'enfant n'est demandé."; }
+else if(DB_ON){ const o=$('#offline'); o.hidden=false; o.textContent = "Quand vous cliquez sur « Envoyer à la brigade », vos réponses sont enregistrées pour la santé publique. Aucun nom d'enfant n'est demandé."; }
 else if(!CONFIG.submitUrl){ const o=$('#offline'); o.hidden=false; o.textContent = "L'envoi automatique n'est pas encore activé. Après avoir répondu, copiez le résumé et transmettez-le à la brigade"+(CONFIG.contactBrigade?' ('+CONFIG.contactBrigade+').':'.'); }
 })();
 </script>
