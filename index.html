@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exclusion milieu de garde</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: form column on the left, live recommendation panel pinned on the right (stacks with a bottom status bar on phones) */
+:root{
+  --bg:#F3F6F7; --surface:#FFFFFF; --sunk:#E9EEF0; --ink:#13232A; --muted:#566A72; --line:#D5DFE3;
+  --accent:#0E6774; --accent-ink:#FFFFFF; --accent-soft:#DCEDEF;
+  --stop:#B03C26; --stop-bg:#FBE8E3; --go:#2A7546; --go-bg:#E3F2E8; --wait:#9A6200; --wait-bg:#FBF0D8;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D161A; --surface:#142128; --sunk:#0F1B21; --ink:#E2EBEE; --muted:#94A7AF; --line:#25373F;
+  --accent:#5BB7C2; --accent-ink:#06262B; --accent-soft:#16353A;
+  --stop:#F08B72; --stop-bg:#3A1D17; --go:#72CC94; --go-bg:#15301F; --wait:#E9B65A; --wait-bg:#33270E;
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0D161A; --surface:#142128; --sunk:#0F1B21; --ink:#E2EBEE; --muted:#94A7AF; --line:#25373F;
+  --accent:#5BB7C2; --accent-ink:#06262B; --accent-soft:#16353A;
+  --stop:#F08B72; --stop-bg:#3A1D17; --go:#72CC94; --go-bg:#15301F; --wait:#E9B65A; --wait-bg:#33270E;
+  color-scheme:dark;}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* Header */
+.top{background:var(--surface);border-bottom:1px solid var(--line)}
+.top .wrap{padding-block:24px;display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.top h1{font-size:clamp(26px,4vw,34px);font-weight:700}
+.top p.lede{margin:0;color:var(--muted);max-width:68ch}
+.tabs{display:flex;gap:4px;overflow-x:auto}
+.tab{border:0;background:none;padding:10px 14px;border-bottom:3px solid transparent;color:var(--muted);font-weight:700;cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .count{font-family:var(--f-mono);font-size:12px;background:var(--sunk);border-radius:99px;padding:1px 7px;margin-left:6px}
+
+main .wrap{padding-block:24px 96px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:28px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
+
+.alert{display:flex;gap:10px;align-items:flex-start;background:var(--stop-bg);color:var(--ink);border-radius:var(--r);padding:12px 14px;font-size:14px;margin-bottom:18px}
+.alert b{color:var(--stop)}
+.notice{background:var(--wait-bg);border-radius:var(--r);padding:12px 14px;font-size:14px;margin-bottom:18px}
+
+/* Form */
+form{display:flex;flex-direction:column;gap:18px}
+fieldset{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);margin:0;padding:18px 20px 20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+legend{display:contents}
+.fs-head{display:flex;align-items:baseline;gap:10px}
+.fs-num{font-family:var(--f-mono);font-size:13px;color:var(--accent)}
+.fs-head h2{font-size:19px;font-weight:600}
+.fs-sub{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field > label, .qlabel{font-weight:700;font-size:15px}
+.hint{font-size:13px;color:var(--muted)}
+input[type=text],input[type=tel],input[type=number],input[type=date],select,textarea{
+  background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;min-width:0}
+textarea{min-height:84px;resize:vertical}
+input.mono{font-family:var(--f-mono)}
+.inline{display:flex;gap:8px}
+.inline > *{min-width:0}
+.inline input{flex:1}
+.inline select{flex:0 0 auto;width:auto}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chip span{display:inline-block;padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--sunk);font-weight:700;font-size:15px;cursor:pointer;user-select:none}
+.chip input:checked + span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip input:focus-visible + span{outline:3px solid var(--accent);outline-offset:2px}
+.chip input:disabled + span{opacity:.4;cursor:not-allowed;text-decoration:line-through}
+
+.q{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 18px;align-items:center;padding-top:14px;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:0;padding-top:0}
+.q .qlabel{font-weight:400}
+.q .qlabel small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+@media (max-width:520px){.q{grid-template-columns:minmax(0,1fr)}}
+
+.subpanel{border-left:3px solid var(--accent);background:var(--accent-soft);padding:14px 16px;border-radius:0 8px 8px 0;display:flex;flex-direction:column;gap:12px}
+.feverflag{font-family:var(--f-mono);font-size:13px;padding:3px 8px;border-radius:6px;align-self:flex-start}
+.feverflag.yes{background:var(--stop-bg);color:var(--stop)}
+.feverflag.no{background:var(--go-bg);color:var(--go)}
+.feverflag.warn{background:var(--wait-bg);color:var(--wait)}
+
+details.def{font-size:14px;color:var(--muted)}
+details.def summary{cursor:pointer;color:var(--accent);font-weight:700}
+.deftable{border-collapse:collapse;margin-top:8px;font-size:14px}
+.deftable td{padding:4px 12px 4px 0;border-bottom:1px solid var(--line);color:var(--ink)}
+.deftable td.num{font-family:var(--f-mono)}
+
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:11px 18px;font-weight:700;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.55;cursor:progress}
+.linkbtn{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;padding:4px;text-decoration:underline}
+
+/* Verdict panel */
+aside.verdict{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 16px);display:flex;flex-direction:column;gap:14px}
+@media (max-width:900px){aside.verdict{position:static}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.status{border-radius:var(--r);padding:18px 20px;display:flex;flex-direction:column;gap:8px;border:1px solid transparent}
+.status .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.status h3{font-size:24px;font-weight:700}
+.status p{margin:0}
+.status.idle{background:var(--sunk);border-color:var(--line)} .status.idle .label{color:var(--muted)}
+.status.stop{background:var(--stop-bg)} .status.stop .label,.status.stop h3{color:var(--stop)}
+.status.go{background:var(--go-bg)} .status.go .label,.status.go h3{color:var(--go)}
+.status.wait{background:var(--wait-bg)} .status.wait .label,.status.wait h3{color:var(--wait)}
+.card h4{margin:0;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.card ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.card li.hl{font-weight:700}
+.tag{color:var(--muted);font-weight:400;font-style:italic;margin-left:4px;white-space:nowrap}
+.small{font-size:13px;color:var(--muted);margin:0}
+.missing{font-size:14px;color:var(--muted)}
+
+.sent{background:var(--surface);border:2px solid var(--accent);border-radius:var(--r);padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.sent h3{font-size:20px}
+.sent p{margin:0}
+pre.summary{white-space:pre-wrap;font-family:var(--f-mono);font-size:12.5px;background:var(--sunk);border-radius:8px;padding:12px;margin:0;max-height:300px;overflow:auto}
+
+/* Mobile bar */
+.mbar{display:none}
+@media (max-width:900px){
+  .mbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:5;align-items:center;justify-content:space-between;gap:12px;
+    background:var(--surface);border-top:1px solid var(--line);
+    padding:10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px))}
+  .mbar .pill{font-weight:700}
+}
+
+/* Lists */
+.listhead{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.listhead h2{font-size:22px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 16px;min-width:120px}
+.stat b{display:block;font-family:var(--f-mono);font-size:24px;font-variant-numeric:tabular-nums}
+.stat span{font-size:13px;color:var(--muted)}
+.reports{display:flex;flex-direction:column;gap:10px}
+details.rep{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+details.rep > summary{list-style:none;cursor:pointer;padding:14px 16px;display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:6px 14px;align-items:center}
+details.rep > summary::-webkit-details-marker{display:none}
+@media (max-width:620px){details.rep > summary{grid-template-columns:minmax(0,1fr) auto}.rep .when{grid-column:1/-1}}
+.rep .when{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rep .who b{display:block}
+.rep .who span{font-size:14px;color:var(--muted)}
+.rep .right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.pill{display:inline-block;font-size:12.5px;font-weight:700;border-radius:99px;padding:3px 10px;white-space:nowrap}
+.pill.stop{background:var(--stop-bg);color:var(--stop)}
+.pill.go{background:var(--go-bg);color:var(--go)}
+.pill.wait{background:var(--wait-bg);color:var(--wait)}
+.pill.idle{background:var(--sunk);color:var(--muted)}
+.pill.s-new{background:var(--accent);color:var(--accent-ink)}
+.pill.s-prog{background:var(--wait-bg);color:var(--wait)}
+.pill.s-done{background:var(--sunk);color:var(--muted)}
+.rep .body{padding:0 16px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px 24px;border-top:1px solid var(--line);padding-top:14px}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:14px;margin:0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.triage{display:flex;flex-direction:column;gap:8px;font-size:14px}
+.triage select{width:auto}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--muted)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#exportBtn{padding:8px 14px;margin-left:6px}
+.err{color:var(--stop);font-size:13px}
+.field.invalid input,.field.invalid select{border-color:var(--stop)}
+.q.invalid .qlabel{color:var(--stop)}
+
+@media (prefers-reduced-motion:no-preference){.status{transition:background-color .25s ease}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">Milieux de garde et scolaires · Brigade de santé publique</div>
+    <h1>Exclusion d'un enfant malade</h1>
+    <p class="lede">Répondez aux questions. Vous obtenez tout de suite une recommandation temporaire basée sur les critères d'exclusion, et votre signalement est transmis à la brigade.</p>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+
+<section id="view-form">
+  <div class="alert" role="note"><div><b>Urgence :</b> difficulté à respirer, enfant très somnolent ou difficile à réveiller, convulsion : composez le <b>911</b>. Pour un conseil santé : Info-Santé <b>811</b>. Cet outil ne remplace pas une consultation avec un professionnel de la santé ni les consignes liées à un diagnostic.</div></div>
+  <div class="notice" id="offline" hidden>L'envoi à la brigade n'est pas disponible dans cette vue. Vous recevez quand même la recommandation; copiez le résumé et transmettez-le à la brigade.</div>
+
+  <div class="layout">
+  <form id="f" novalidate>
+    <fieldset>
+      <legend><div class="fs-head"><span class="fs-num">1</span><h2>Le milieu</h2></div></legend>
+      <div class="field">
+        <span class="qlabel">Type de milieu</span>
+        <div class="chips" id="f-type">
+          <label class="chip"><input type="radio" name="type" value="CPE"><span>CPE</span></label>
+          <label class="chip"><input type="radio" name="type" value="Garderie"><span>Garderie</span></label>
+          <label class="chip"><input type="radio" name="type" value="Milieu familial"><span>Milieu familial</span></label>
+          <label class="chip"><input type="radio" name="type" value="École"><span>École</span></label>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field"><label for="f-nom">Nom du milieu</label><input type="text" id="f-nom" name="nom" autocomplete="organization"></div>
+        <div class="field"><label for="f-contact">Personne à joindre</label><input type="text" id="f-contact" name="contact" autocomplete="name"></div>
+        <div class="field"><label for="f-tel">Téléphone</label><input type="tel" id="f-tel" name="tel" autocomplete="tel"></div>
+      </div>
+      <p class="small">Ces coordonnées sont gardées sur cet appareil pour vos prochains signalements.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend><div class="fs-head"><span class="fs-num">2</span><h2>L'enfant</h2></div></legend>
+      <div class="row">
+        <div class="field"><label for="f-age">Âge</label>
+          <div class="inline"><input type="number" class="mono" id="f-age" name="age" min="0" max="18" step="1" inputmode="numeric"><select id="f-ageunit" name="ageunit" aria-label="Unité d'âge"><option value="mois">mois</option><option value="ans" selected>ans</option></select></div>
+        </div>
+        <div class="field"><label for="f-debut">Début des symptômes</label><input type="date" id="f-debut" name="debut"></div>
+      </div>
+      <p class="small">Aucun nom ni identifiant de l'enfant n'est demandé.</p>
+      <div class="field"><label for="f-autres">Autres enfants ou membres du personnel avec des symptômes semblables</label><input type="number" class="mono" id="f-autres" name="autres" min="0" step="1" inputmode="numeric" placeholder="0" style="max-width:140px"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend><div class="fs-head"><span class="fs-num">3</span><h2>Fièvre</h2></div></legend>
+      <p class="fs-sub">La fièvre est un critère parmi d'autres. Si l'enfant n'a pas de fièvre, les autres critères s'appliquent quand même.</p>
+      <div class="field">
+        <span class="qlabel">La température a-t-elle été prise?</span>
+        <div class="chips" id="f-mesure">
+          <label class="chip"><input type="radio" name="mesure" value="oui"><span>Oui</span></label>
+          <label class="chip"><input type="radio" name="mesure" value="non"><span>Non</span></label>
+        </div>
+      </div>
+      <div class="row" id="tempRow" hidden>
+        <div class="field"><label for="f-temp">Température (°C)</label><input type="number" class="mono" id="f-temp" name="temp" min="34" max="43" step="0.1" inputmode="decimal" placeholder="38,2"></div>
+        <div class="field"><span class="qlabel">Prise par</span>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="voie" value="rectum"><span>Rectum</span></label>
+            <label class="chip"><input type="radio" name="voie" value="bouche" id="voie-bouche"><span>Bouche</span></label>
+            <label class="chip"><input type="radio" name="voie" value="aisselle" id="voie-aisselle"><span>Aisselle</span></label>
+          </div>
+          <span class="hint" id="voieHint">La température par le rectum est la plus fiable.</span>
+        </div>
+      </div>
+      <span class="feverflag" id="feverFlag" hidden></span>
+      <div class="field" id="contextRow" hidden>
+        <span class="qlabel">Où la fièvre a-t-elle été remarquée?</span>
+        <div class="chips" id="f-context">
+          <label class="chip"><input type="radio" name="context" value="maison"><span>Le matin, à la maison</span></label>
+          <label class="chip"><input type="radio" name="context" value="garde"><span>Pendant la journée, au milieu de garde</span></label>
+          <label class="chip"><input type="radio" name="context" value="ecole"><span>Pendant la journée, à l'école</span></label>
+        </div>
+      </div>
+
+      <div class="subpanel" id="recheck" hidden>
+        <p style="margin:0"><b>Enfant de 3 mois et plus avec fièvre au milieu de garde :</b> si indiqué, donnez de l'acétaminophène selon le protocole, puis reprenez la température 1 heure après, par la même voie.</p>
+        <div class="field"><span class="qlabel">Acétaminophène donné?</span>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="aceta" value="oui"><span>Oui, selon le protocole</span></label>
+            <label class="chip"><input type="radio" name="aceta" value="non-indique"><span>Non indiqué / non donné</span></label>
+          </div>
+        </div>
+        <div class="field"><label for="f-temp2">Température 1 heure après (°C)</label><input type="number" class="mono" id="f-temp2" name="temp2" min="34" max="43" step="0.1" inputmode="decimal" style="max-width:160px"><span class="hint">Laissez vide si l'heure n'est pas encore passée.</span></div>
+      </div>
+
+      <details class="def"><summary>Définition de la fièvre</summary>
+        <table class="deftable">
+          <tr><td>Moins de 3 mois</td><td>Rectum</td><td class="num">≥ 38,0 °C</td></tr>
+          <tr><td rowspan="3">3 mois et plus</td><td>Rectum</td><td class="num">≥ 38,5 °C</td></tr>
+          <tr><td>Bouche (5 ans et plus seulement)</td><td class="num">≥ 38,0 °C</td></tr>
+          <tr><td>Aisselle</td><td class="num">≥ 37,5 °C</td></tr>
+        </table>
+      </details>
+    </fieldset>
+
+    <fieldset id="fs-q">
+      <legend><div class="fs-head"><span class="fs-num">4</span><h2>Autres critères</h2></div></legend>
+      <p class="fs-sub">Ces critères s'appliquent avec ou sans fièvre. Une seule réponse « oui » suffit pour exclure, mais répondez à toutes les questions.</p>
+      <div class="q" data-q="etat"><div class="qlabel">Son état de santé l'empêche-t-il de suivre les activités du groupe, ou empêche-t-il la personne responsable de s'occuper adéquatement des autres enfants?</div>
+        <div class="chips"><label class="chip"><input type="radio" name="etat" value="oui"><span>Oui</span></label><label class="chip"><input type="radio" name="etat" value="non"><span>Non</span></label></div></div>
+      <div class="q" data-q="vomit"><div class="qlabel">A-t-il eu 2 vomissements ou plus dans les dernières 24 heures?</div>
+        <div class="chips"><label class="chip"><input type="radio" name="vomit" value="oui"><span>Oui</span></label><label class="chip"><input type="radio" name="vomit" value="non"><span>Non</span></label></div></div>
+      <div class="q" data-q="diarrhee"><div class="qlabel">A-t-il de la diarrhée trop abondante pour être contenue dans la couche, OU avec du sang ou du mucus, OU est-il incontinent?<small>Incontinent : incapable de se rendre à la salle de bain.</small></div>
+        <div class="chips"><label class="chip"><input type="radio" name="diarrhee" value="oui"><span>Oui</span></label><label class="chip"><input type="radio" name="diarrhee" value="non"><span>Non</span></label></div></div>
+      <div class="q" data-q="lesions"><div class="qlabel">A-t-il des lésions de la peau avec écoulement de pus qui ne peuvent pas être couvertes par un pansement imperméable?</div>
+        <div class="chips"><label class="chip"><input type="radio" name="lesions" value="oui"><span>Oui</span></label><label class="chip"><input type="radio" name="lesions" value="non"><span>Non</span></label></div></div>
+      <div class="q" data-q="consigne"><div class="qlabel">Un professionnel de la santé a-t-il demandé d'exclure l'enfant temporairement?</div>
+        <div class="chips"><label class="chip"><input type="radio" name="consigne" value="oui"><span>Oui</span></label><label class="chip"><input type="radio" name="consigne" value="non"><span>Non</span></label></div></div>
+    </fieldset>
+
+    <fieldset>
+      <legend><div class="fs-head"><span class="fs-num">5</span><h2>Autres informations</h2></div></legend>
+      <div class="field"><label for="f-notes">Symptômes observés, diagnostic connu, questions pour la brigade</label><textarea id="f-notes" name="notes" placeholder="Ex. : toux, éruption sur le tronc, diagnostic de gastro-entérite par le médecin…"></textarea></div>
+    </fieldset>
+
+    <div class="actions">
+      <button type="submit" class="btn primary" id="submitBtn">Envoyer à la brigade</button>
+      <button type="button" class="btn" id="copyBtn">Copier le résumé</button>
+      <button type="button" class="linkbtn" id="resetBtn">Recommencer</button>
+      <button type="button" class="linkbtn" id="exampleBtn">Remplir un exemple</button>
+    </div>
+    <p class="err" id="formErr" hidden></p>
+  </form>
+
+  <aside class="verdict" id="verdict" aria-live="polite"></aside>
+  </div>
+</section>
+
+</div>
+</main>
+
+<div class="mbar" id="mbar"><span class="pill idle" id="mbarPill">En cours de saisie</span><a href="#verdict" class="linkbtn">Voir la recommandation</a></div>
+
+<script>
+/* ===== CONFIGURATION — à remplir par l'équipe web / TI =====
+   submitUrl      : adresse qui reçoit chaque signalement (requête POST, corps JSON).
+                    Exemples : déclencheur HTTP Power Automate, Microsoft Forms/SharePoint via flux,
+                    API interne. Laisser vide = pas d'envoi; le milieu copie le résumé.
+   contentType    : "application/json" (Power Automate, API) ou "text/plain" (Google Apps Script).
+   contactBrigade : téléphone ou courriel affiché aux milieux de garde. */
+window.EXCLUSION_CONFIG = {
+  submitUrl: "",
+  contentType: "application/json",
+  contactBrigade: ""
+};
+</script>
+<script>
+(function(){
+const CONFIG = Object.assign({submitUrl:'',contentType:'application/json',contactBrigade:''}, window.EXCLUSION_CONFIG||{});
+const $ = s => document.querySelector(s);
+const form = $('#f');
+const LS = 'exclusion-garde-milieu';
+let lastSent = null;
+
+/* ---------- criteria (from the flowchart 25-207-01WFA) ---------- */
+const REASONS = {
+  fever_home:   {t:"Fièvre le matin à la maison", r:"fievre"},
+  fever_school: {t:"Fièvre apparue à l'école", r:"fievre"},
+  fever_infant: {t:"Fièvre chez un enfant de moins de 3 mois", r:"fievre"},
+  fever_persist:{t:"Fièvre toujours présente 1 heure après (acétaminophène si indiqué)", r:"fievre"},
+  etat:     {t:"État de santé qui l'empêche de suivre les activités ou qui empêche de s'occuper des autres enfants", r:"etat"},
+  vomit:    {t:"2 vomissements ou plus dans les dernières 24 heures", r:"vomit"},
+  diarrhee: {t:"Diarrhée non contenue dans la couche, avec sang ou mucus, ou enfant incontinent", r:"diarrhee"},
+  lesions:  {t:"Lésions avec pus qui ne peuvent pas être couvertes par un pansement imperméable", r:"lesions"},
+  consigne: {t:"Consigne d'exclusion d'un professionnel de la santé", r:"consigne"}
+};
+const RETURN = [
+  ["fievre","Absence de fièvre."],
+  ["etat","Son état général lui permet de participer aux activités du groupe et demande peu ou pas de soins supplémentaires."],
+  ["vomit","Aucun vomissement depuis 24 heures."],
+  ["diarrhee","Si diarrhée : selles retenues dans la couche ou enfant continent, sans sang ni mucus."],
+  ["lesions","Si lésions avec pus : plus d'écoulement, ou lésions couvertes par un pansement imperméable."],
+  ["consigne","Si l'exclusion vient d'un professionnel de la santé : retour selon sa consigne."]
+];
+const QS = ["etat","vomit","diarrhee","lesions","consigne"];
+const CTX = {maison:"Le matin, à la maison", garde:"Au milieu de garde", ecole:"À l'école"};
+
+function read(){ const o={}; for(const [k,v] of new FormData(form)) o[k]=typeof v==='string'?v.trim():v; return o; }
+function num(v){ if(v==null||v==='') return NaN; return parseFloat(String(v).replace(',','.')); }
+function ageMonths(f){ const a=num(f.age); if(isNaN(a)) return NaN; return f.ageunit==='mois'? a : a*12; }
+
+function feverAt(t, voie, m){
+  if(isNaN(t) || !voie) return null;
+  if(isNaN(m)) return 'noage';
+  if(m < 3) return voie==='rectum' ? t>=38.0 : 'route';
+  if(voie==='rectum') return t>=38.5;
+  if(voie==='bouche') return m>=60 ? t>=38.0 : 'route';
+  if(voie==='aisselle') return t>=37.5;
+  return null;
+}
+
+function evaluate(f){
+  const m = ageMonths(f), reasons=[], missing=[], notes=[];
+  let pending=null, fever=null, fever2=null;
+  if(f.mesure==='oui'){
+    fever = feverAt(num(f.temp), f.voie, m);
+    if(fever===null) missing.push("la température et la voie");
+    else if(fever==='noage') missing.push("l'âge de l'enfant");
+    else if(fever==='route') notes.push(m<3 ? "Moins de 3 mois : seule la température rectale est définie. Reprenez-la par le rectum." : "La voie buccale s'applique seulement à 5 ans et plus. Reprenez la température par le rectum ou l'aisselle.");
+    else if(fever===true && !f.context) missing.push("où la fièvre a été remarquée");
+    else if(fever===true){
+      if(f.context==='maison') reasons.push('fever_home');
+      else if(f.context==='ecole') reasons.push('fever_school');
+      else if(m<3) reasons.push('fever_infant');
+      else {
+        fever2 = feverAt(num(f.temp2), f.voie, m);
+        if(fever2===true) reasons.push('fever_persist');
+        else if(fever2===false) notes.push("La fièvre n'est plus présente 1 heure après.");
+        else pending = "Si indiqué, donnez de l'acétaminophène selon le protocole et reprenez la température dans 1 heure.";
+      }
+    }
+  } else if(f.mesure==='non'){
+    notes.push("La température n'a pas été prise. Prenez-la (par le rectum de préférence) pour compléter l'évaluation.");
+  } else missing.push("si la température a été prise");
+  QS.forEach(q => { if(f[q]==='oui') reasons.push(q); else if(f[q]!=='non') missing.push(null); });
+  const unanswered = QS.filter(q=>!f[q]).length;
+  if(unanswered) missing.push(unanswered===1 ? "1 question sur l'état de l'enfant" : unanswered+" questions sur l'état de l'enfant");
+  const miss = missing.filter(Boolean);
+  let state;
+  if(reasons.length) state='stop';
+  else if(pending) state='wait';
+  else if(miss.length) state='idle';
+  else state='go';
+  return {state, reasons, missing:miss, notes, pending, fever, fever2, months:m};
+}
+
+/* ---------- UI: form reactivity ---------- */
+function syncForm(f, ev){
+  $('#tempRow').hidden = f.mesure!=='oui';
+  const m = ageMonths(f);
+  const bouche = $('#voie-bouche'), ais = $('#voie-aisselle');
+  const infant = !isNaN(m) && m<3, under5 = !isNaN(m) && m<60;
+  bouche.disabled = infant || under5; ais.disabled = infant;
+  if(bouche.disabled && bouche.checked) bouche.checked=false;
+  if(ais.disabled && ais.checked) ais.checked=false;
+  $('#voieHint').textContent = infant ? "Moins de 3 mois : température par le rectum seulement." : under5 ? "Moins de 5 ans : rectum ou aisselle. Le rectum est le plus fiable." : "La température par le rectum est la plus fiable.";
+  const flag = $('#feverFlag');
+  if(f.mesure==='oui' && (ev.fever===true || ev.fever===false)){
+    flag.hidden=false; flag.className='feverflag '+(ev.fever?'yes':'no');
+    flag.textContent = ev.fever ? 'Fièvre selon la définition' : 'Pas de fièvre selon la définition';
+  } else if(ev.fever==='route'){ flag.hidden=false; flag.className='feverflag warn'; flag.textContent='Voie non valide pour cet âge'; }
+  else flag.hidden=true;
+  $('#contextRow').hidden = !(f.mesure==='oui' && ev.fever===true);
+  $('#recheck').hidden = !(f.mesure==='oui' && ev.fever===true && f.context==='garde' && m>=3);
+}
+
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function verdictHTML(f, ev){
+  let h='';
+  if(ev.state==='stop'){
+    const home = f.context==='maison';
+    h+=`<div class="status stop"><span class="label">Recommandation temporaire</span><h3>Exclure l'enfant du milieu</h3><p>${home?"L'enfant doit rester à la maison.":"Appelez le parent pour qu'il vienne chercher l'enfant. L'enfant reste à la maison jusqu'à ce que les conditions de retour soient remplies."}</p></div>`;
+    h+=`<div class="card"><h4>Pourquoi</h4><ul>${ev.reasons.map(r=>`<li>${esc(REASONS[r].t)}</li>`).join('')}</ul></div>`;
+    const keys = new Set(ev.reasons.map(r=>REASONS[r].r));
+    h+=`<div class="card"><h4>Retour permis quand toutes ces conditions sont remplies</h4><ul>${RETURN.map(([k,t])=>`<li class="${keys.has(k)?'hl':''}">${esc(t)}${keys.has(k)?' <span class="tag">(applicable)</span>':''}</li>`).join('')}</ul></div>`;
+  } else if(ev.state==='wait'){
+    h+=`<div class="status wait"><span class="label">À réévaluer</span><h3>Reprendre la température dans 1 heure</h3><p>${esc(ev.pending)}</p><p>Si la fièvre est toujours présente, l'enfant sera exclu. Revenez inscrire la température dans cette fiche.</p></div>`;
+  } else if(ev.state==='go'){
+    h+=`<div class="status go"><span class="label">Recommandation temporaire</span><h3>Pas besoin d'exclure l'enfant</h3><p>Surveillez son état de santé.</p></div>`;
+    h+=`<div class="card"><h4>Rehaussez les pratiques de base</h4><ul><li>Hygiène des mains</li><li>Hygiène et étiquette respiratoires</li><li>Nettoyage et désinfection des objets, des surfaces et des locaux</li></ul><p class="small">Si l'état de l'enfant change, refaites l'évaluation.</p></div>`;
+  } else {
+    h+=`<div class="status idle"><span class="label">Recommandation</span><h3>Répondez aux questions</h3><p>La recommandation se met à jour à chaque réponse. Une seule réponse « oui » suffit pour exclure l'enfant.</p></div>`;
+  }
+  if(ev.notes.length) h+=`<div class="card"><h4>À noter</h4><ul>${ev.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`;
+  if(ev.missing.length && ev.state!=='idle') h+=`<p class="missing">Il manque encore : ${esc(ev.missing.join(', '))}.</p>`;
+  else if(ev.missing.length) h+=`<p class="missing">À compléter : ${esc(ev.missing.join(', '))}.</p>`;
+  if(lastSent) h+=lastSent;
+  h+=`<div class="card"><h4>Ensuite</h4><p class="small" style="color:var(--ink)">Cette recommandation est temporaire. Le signalement est transmis à la brigade de santé publique, qui vous contactera au besoin pour confirmer ou ajuster les consignes. Si d'autres enfants développent les mêmes symptômes, faites un nouveau signalement.</p></div>`;
+  return h;
+}
+
+const PILL = {stop:["stop","Exclure"], go:["go","Pas d'exclusion"], wait:["wait","Réévaluer dans 1 h"], idle:["idle","Incomplet"]};
+
+function refresh(){
+  const f = read(); const ev = evaluate(f);
+  syncForm(f, ev);
+  const ev2 = evaluate(read());
+  $('#verdict').innerHTML = verdictHTML(f, ev2);
+  const p = $('#mbarPill'); p.className='pill '+PILL[ev2.state][0]; p.textContent = ev2.state==='idle'?'En cours de saisie':PILL[ev2.state][1];
+  saveMilieu(f);
+  return {f, ev:ev2};
+}
+form.addEventListener('input', ()=>{ lastSent=null; refresh(); clearInvalid(); });
+form.addEventListener('change', ()=>{ refresh(); });
+
+/* ---------- local convenience ---------- */
+function saveMilieu(f){ try{ localStorage.setItem(LS, JSON.stringify({type:f.type||'',nom:f.nom||'',contact:f.contact||'',tel:f.tel||''})); }catch(e){} }
+function loadMilieu(){
+  try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(!s) return;
+    ['nom','contact','tel'].forEach(k=>{ if(s[k]) form.elements[k].value=s[k]; });
+    if(s.type){ const r=form.querySelector(`input[name=type][value="${CSS.escape(s.type)}"]`); if(r) r.checked=true; }
+  }catch(e){}
+}
+
+/* ---------- validation & record ---------- */
+function clearInvalid(){ form.querySelectorAll('.invalid').forEach(el=>el.classList.remove('invalid')); $('#formErr').hidden=true; }
+function validate(f, ev){
+  const bad=[];
+  const need = (name, label) => { if(!f[name]){ bad.push(label); const el=form.elements[name]; const fld = el && (el.closest ? el.closest('.field') : null); if(fld) fld.classList.add('invalid'); } };
+  need('nom','nom du milieu'); need('tel','téléphone'); need('age','âge');
+  if(ev.fever===true && !f.context) bad.push('où la fièvre a été remarquée');
+  if(!f.mesure) bad.push('température prise ou non');
+  if(f.mesure==='oui' && (isNaN(num(f.temp))||!f.voie)) bad.push('température et voie');
+  QS.forEach(q=>{ if(!f[q]){ bad.push('question'); const el=form.querySelector(`.q[data-q="${q}"]`); if(el) el.classList.add('invalid'); } });
+  return [...new Set(bad)];
+}
+function record(f, ev){
+  return {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+    createdAt: new Date().toISOString(),
+    milieu:{type:f.type||'',nom:f.nom,contact:f.contact||'',tel:f.tel},
+    enfant:{age:f.age, ageunit:f.ageunit, debut:f.debut||'', autres:f.autres||''},
+    fievre:{context: ev.fever===true ? f.context : '', mesure:f.mesure, temp:f.temp||'', voie:f.voie||'', aceta:f.aceta||'', temp2:f.temp2||'', fever:ev.fever, fever2:ev.fever2},
+    reponses:Object.fromEntries(QS.map(q=>[q,f[q]||''])),
+    notes:f.notes||'',
+    verdict:{state:ev.state, reasons:ev.reasons, notes:ev.notes}
+  };
+}
+function summary(r){
+  const yn = v => v==='oui'?'Oui':v==='non'?'Non':'—';
+  const temp = r.fievre.mesure==='oui' ? `${r.fievre.temp} °C (${r.fievre.voie})${r.fievre.temp2?` · 1 h après : ${r.fievre.temp2} °C`:''}${r.fievre.aceta?` · acétaminophène : ${r.fievre.aceta==='oui'?'oui':'non'}`:''}` : 'non prise';
+  return [
+    `SIGNALEMENT – ${new Date(r.createdAt).toLocaleString('fr-CA')}`,
+    `Milieu : ${r.milieu.nom} (${r.milieu.type||'type non précisé'}) – ${r.milieu.contact} – ${r.milieu.tel}`,
+    `Enfant : ${r.enfant.age} ${r.enfant.ageunit}${r.enfant.debut?` – début ${r.enfant.debut}`:''}`,
+    `Autres cas semblables : ${r.enfant.autres||'0'}`,
+    `Moment : ${CTX[r.fievre.context]||'—'}`,
+    `Température : ${temp}`,
+    `État empêche les activités : ${yn(r.reponses.etat)}`,
+    `2 vomissements+ en 24 h : ${yn(r.reponses.vomit)}`,
+    `Diarrhée non contenue / sang / mucus / incontinent : ${yn(r.reponses.diarrhee)}`,
+    `Lésions avec pus non couvrables : ${yn(r.reponses.lesions)}`,
+    `Consigne d'un professionnel : ${yn(r.reponses.consigne)}`,
+    `Notes : ${r.notes||'—'}`,
+    `RECOMMANDATION TEMPORAIRE : ${PILL[r.verdict.state][1]}${r.verdict.reasons.length?' – '+r.verdict.reasons.map(k=>REASONS[k].t).join('; '):''}`
+  ].join('\n');
+}
+
+async function copyText(t, btn){
+  try{ await navigator.clipboard.writeText(t); const o=btn.textContent; btn.textContent='Copié'; setTimeout(()=>btn.textContent=o,1600); }
+  catch(e){ lastSent = `<div class="sent"><h3>Résumé à copier</h3><pre class="summary" id="sumpre">${esc(t)}</pre></div>`; refresh(); const pre=$('#sumpre'); if(pre){ const r=document.createRange(); r.selectNodeContents(pre); const s=getSelection(); s.removeAllRanges(); s.addRange(r);} }
+}
+
+$('#copyBtn').addEventListener('click', e=>{ const {f,ev}=refresh(); copyText(summary(record(f,ev)), e.currentTarget); });
+
+form.addEventListener('submit', async e=>{
+  e.preventDefault(); clearInvalid();
+  const {f, ev} = refresh();
+  const bad = validate(f, ev);
+  if(bad.length){ const err=$('#formErr'); err.hidden=false; err.textContent = 'Complétez : '+bad.map(b=>b==='question'?"les questions sur l'état de l'enfant":b).join(', ')+'.'; return; }
+  const rec = record(f, ev);
+  const contact = CONFIG.contactBrigade ? `<p>Brigade : <b>${esc(CONFIG.contactBrigade)}</b></p>` : '';
+  if(!CONFIG.submitUrl){
+    lastSent = `<div class="sent"><h3>Transmettez ce résumé à la brigade</h3>${contact}<pre class="summary">${esc(summary(rec))}</pre></div>`;
+    refresh(); return;
+  }
+  const btn=$('#submitBtn'); btn.disabled=true; btn.textContent='Envoi…';
+  try{
+    const res = await fetch(CONFIG.submitUrl, {method:'POST', headers:{'Content-Type':CONFIG.contentType}, body: JSON.stringify({...rec, resume: summary(rec)})});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    lastSent = `<div class="sent"><h3>Signalement envoyé à la brigade</h3><p>Envoyé le ${esc(new Date(rec.createdAt).toLocaleString('fr-CA'))}. Suivez la recommandation ci-dessus en attendant que la brigade vous contacte au besoin.</p></div>`;
+    refresh();
+    $('#verdict').scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth', block:'start'});
+  }catch(err){
+    lastSent = `<div class="sent"><h3>Signalement non envoyé</h3><p>L'envoi n'a pas fonctionné. Réessayez, ou copiez ce résumé et transmettez-le à la brigade.</p>${contact}<pre class="summary">${esc(summary(rec))}</pre></div>`;
+    refresh();
+  }finally{ btn.disabled=false; btn.textContent='Envoyer à la brigade'; }
+});
+
+$('#resetBtn').addEventListener('click', ()=>{
+  const keep = {type:read().type, nom:form.elements.nom.value, contact:form.elements.contact.value, tel:form.elements.tel.value};
+  form.reset(); lastSent=null;
+  ['nom','contact','tel'].forEach(k=>form.elements[k].value=keep[k]);
+  if(keep.type){ const r=form.querySelector(`input[name=type][value="${CSS.escape(keep.type)}"]`); if(r) r.checked=true; }
+  clearInvalid(); refresh(); window.scrollTo({top:0});
+});
+
+$('#exampleBtn').addEventListener('click', ()=>{
+  const set=(n,v)=>{ const els=form.querySelectorAll(`[name="${n}"]`); if(!els.length) return; if(els[0].type==='radio'){ els.forEach(x=>x.checked=x.value===v); } else els[0].value=v; };
+  set('type','CPE'); if(!form.elements.nom.value) set('nom','CPE Exemple'); if(!form.elements.contact.value) set('contact','Personne exemple'); if(!form.elements.tel.value) set('tel','000-000-0000');
+  set('age','2'); set('ageunit','ans'); set('autres','1');
+  set('context','garde'); set('mesure','oui'); refresh(); set('temp','38.9'); set('voie','rectum'); refresh();
+  set('aceta','oui'); set('temp2','');
+  set('etat','non'); set('vomit','non'); set('diarrhee','non'); set('lesions','non'); set('consigne','non');
+  set('notes','EXEMPLE – fiche fictive pour démonstration, ne pas envoyer.');
+  lastSent=null; refresh();
+});
+
+/* ---------- boot ---------- */
+loadMilieu(); refresh();
+if(!CONFIG.submitUrl){ const o=$('#offline'); o.hidden=false; o.textContent = "L'envoi automatique n'est pas encore activé. Après avoir répondu, copiez le résumé et transmettez-le à la brigade"+(CONFIG.contactBrigade?' ('+CONFIG.contactBrigade+').':'.'); }
+})();
+</script>
+</body>
+</html>
