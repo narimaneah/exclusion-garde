@@ -353,7 +353,7 @@ details.rep > summary::-webkit-details-marker{display:none}
 <div class="mbar" id="mbar"><span class="pill idle" id="mbarPill">En cours de saisie</span><a href="#verdict" class="linkbtn">Voir la recommandation</a></div>
 
 <script>
-/* ===== CONFIGURATION — à remplir par l'équipe web / TI =====
+/* ===== CONFIGURATION =====
    formsPrefillUrl: lien prérempli Microsoft Forms (bouton « Obtenir l'URL préremplie »),
                     créé en inscrivant MILIEU, TEL, RECO, RESUME et BRIGADE dans les réponses.
                     Rempli = « Envoyer » ouvre ce formulaire avec toutes les réponses déjà inscrites.
@@ -366,9 +366,9 @@ details.rep > summary::-webkit-details-marker{display:none}
    supabaseKey    : clé publique du projet (Publishable key ou anon key). JAMAIS la clé secrète / service_role.
                     Si ces deux champs sont remplis, chaque signalement envoyé est enregistré dans la base de données. */
 window.EXCLUSION_CONFIG = {
-  formsPrefillUrl: "",
-  supabaseUrl: "",
-  supabaseKey: "",
+  formsPrefillUrl: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=KP7hBotfdUC_bK4kvhp5kh5olmmVHo1Bgz-VXjqPf9pUMUFSUlFUSzVaV0RCVEJQTTczNlpOTVgzOC4u&r8cc333a109d34b69822c4350d6b76f0d=MILIEU&r6ca19c78b3944e4898be540ed005cacf=TEL&r9d1b170ea2c248a7a1ed96bbfdfba118=RECO&r223adf8618814e6da6c80493fbcfb7b6=RESUME&rd1482d57db7d490e9019acd91d33ab6a=BRIGADE",
+  supabaseUrl: "https://ahcsofbwujovaufqlkel.supabase.co",
+  supabaseKey: "sb_publishable_F-Hwo69WjCWpi314gorjJw_Aw63o8q9",
   supabaseTable: "signalements",
   submitUrl: "",
   contentType: "application/json",
