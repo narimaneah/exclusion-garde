@@ -224,6 +224,9 @@ details.rep > summary::-webkit-details-marker{display:none}
         <div class="field"><label for="f-contact">Personne à joindre</label><input type="text" id="f-contact" name="contact" autocomplete="name"></div>
         <div class="field"><label for="f-tel">Téléphone</label><input type="tel" id="f-tel" name="tel" autocomplete="tel"></div>
       </div>
+      <div class="row">
+        <div class="field" id="brigadeField"><label for="f-brigade">Brigade ou territoire</label><span id="brigadeSlot" style="display:contents"></span><span class="hint" id="brigadeHint"></span></div>
+      </div>
       <p class="small">Ces coordonnées sont gardées sur cet appareil pour vos prochains signalements.</p>
     </fieldset>
 
@@ -355,16 +358,32 @@ details.rep > summary::-webkit-details-marker{display:none}
                     Exemples : déclencheur HTTP Power Automate, Microsoft Forms/SharePoint via flux,
                     API interne. Laisser vide = pas d'envoi; le milieu copie le résumé.
    contentType    : "application/json" (Power Automate, API) ou "text/plain" (Google Apps Script).
-   contactBrigade : téléphone ou courriel affiché aux milieux de garde. */
+   contactBrigade : téléphone ou courriel affiché aux milieux de garde.
+   supabaseUrl    : adresse du projet Supabase (Project URL), ex. "https://abcd1234.supabase.co".
+   supabaseKey    : clé publique du projet (Publishable key ou anon key). JAMAIS la clé secrète / service_role.
+                    Si ces deux champs sont remplis, chaque signalement envoyé est enregistré dans la base de données. */
 window.EXCLUSION_CONFIG = {
+  supabaseUrl: "",
+  supabaseKey: "",
+  supabaseTable: "signalements",
   submitUrl: "",
   contentType: "application/json",
   contactBrigade: ""
 };
+/* ===== BRIGADES — une ligne par brigade =====
+   code : court identifiant utilisé dans le lien (…/?brigade=12)
+   nom  : nom affiché ;  territoire : facultatif (CLSC, quartier…)
+   Exemple : { code: "12", nom: "Brigade Centre-Sud", territoire: "CLSC des Faubourgs" },
+   Laisser la liste vide = champ texte libre. */
+window.EXCLUSION_BRIGADES = [
+];
 </script>
 <script>
 (function(){
-const CONFIG = Object.assign({submitUrl:'',contentType:'application/json',contactBrigade:''}, window.EXCLUSION_CONFIG||{});
+const CONFIG = Object.assign({supabaseUrl:'',supabaseKey:'',supabaseTable:'signalements',submitUrl:'',contentType:'application/json',contactBrigade:''}, window.EXCLUSION_CONFIG||{});
+const DB_ON = !!(CONFIG.supabaseUrl && CONFIG.supabaseKey);
+const newSession = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2,12);
+let SESSION = newSession();
 const $ = s => document.querySelector(s);
 const form = $('#f');
 const LS = 'exclusion-garde-milieu';
@@ -486,6 +505,24 @@ function syncForm(f, ev){
   $('#recheck').hidden = !(f.mesure==='oui' && ev.fever===true && f.context==='garde' && m>=3);
 }
 
+
+/* ---------- brigade / territoire ---------- */
+const BRIGADES = window.EXCLUSION_BRIGADES || [];
+const URL_BRIGADE = (()=>{ try{ return (new URLSearchParams(location.search).get('brigade')||'').trim(); }catch(e){ return ''; } })();
+function brigadeLabel(code){ const b = BRIGADES.find(x=>String(x.code)===String(code)); return b ? `${b.code} – ${b.nom}${b.territoire?' ('+b.territoire+')':''}` : (code||''); }
+function setupBrigade(){
+  const slot=$('#brigadeSlot'), hint=$('#brigadeHint'); if(!slot) return;
+  if(URL_BRIGADE){
+    slot.innerHTML = `<input type="text" id="f-brigade" name="brigade" readonly>`; $('#f-brigade').value = URL_BRIGADE;
+    hint.textContent = 'Rempli automatiquement par votre lien : ' + brigadeLabel(URL_BRIGADE);
+  } else if(BRIGADES.length){
+    slot.innerHTML = `<select id="f-brigade" name="brigade"><option value="">Choisir…</option>${BRIGADES.map(b=>`<option value="${esc(b.code)}">${esc(brigadeLabel(b.code))}</option>`).join('')}</select>`;
+    hint.textContent = 'Choisissez la brigade qui dessert votre milieu.';
+  } else {
+    slot.innerHTML = `<input type="text" id="f-brigade" name="brigade" placeholder="Ex. : CLSC, quartier ou nom de la brigade">`;
+    hint.textContent = 'Si vous la connaissez.';
+  }
+}
 function CONFIG_CONTACT(){ return CONFIG.contactBrigade ? ' Vous pouvez aussi joindre la brigade : <b>'+esc(CONFIG.contactBrigade)+'</b>.' : ''; }
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -537,10 +574,11 @@ form.addEventListener('input', ()=>{ lastSent=null; refresh(); clearInvalid(); }
 form.addEventListener('change', ()=>{ refresh(); });
 
 /* ---------- local convenience ---------- */
-function saveMilieu(f){ try{ localStorage.setItem(LS, JSON.stringify({type:f.type||'',nom:f.nom||'',contact:f.contact||'',tel:f.tel||''})); }catch(e){} }
+function saveMilieu(f){ try{ localStorage.setItem(LS, JSON.stringify({type:f.type||'',nom:f.nom||'',contact:f.contact||'',tel:f.tel||'',brigade: URL_BRIGADE ? '' : (f.brigade||'')})); }catch(e){} }
 function loadMilieu(){
   try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(!s) return;
     ['nom','contact','tel'].forEach(k=>{ if(s[k]) form.elements[k].value=s[k]; });
+    if(s.brigade && !URL_BRIGADE && form.elements.brigade) form.elements.brigade.value=s.brigade;
     if(s.type){ const r=form.querySelector(`input[name=type][value="${CSS.escape(s.type)}"]`); if(r) r.checked=true; }
   }catch(e){}
 }
@@ -561,9 +599,9 @@ function validate(f, ev){
 }
 function record(f, ev){
   return {
-    id: Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+    id: SESSION,
     createdAt: new Date().toISOString(),
-    milieu:{type:f.type||'',nom:f.nom,contact:f.contact||'',tel:f.tel},
+    milieu:{type:f.type||'',nom:f.nom,contact:f.contact||'',tel:f.tel,brigade:f.brigade||''},
     enfant:{age:f.age, ageunit:f.ageunit, debut:f.debut||'', autres:f.autres||''},
     fievre:{context: ev.fever===true ? f.context : '', mesure:f.mesure, temp:f.temp||'', voie:f.voie||'', aceta:f.aceta||'', temp2:f.temp2||'', fever:ev.fever, fever2:ev.fever2},
     reponses:Object.fromEntries(QS.map(q=>[q,f[q]||''])),
@@ -580,6 +618,7 @@ function summary(r){
     ...(r.diagnostic&&r.diagnostic.mado ? [`*** PRIORITÉ – MADO : ${r.diagnostic.maladie} (indiqué par le milieu, à vérifier) ***`] : []),
     `SIGNALEMENT – ${new Date(r.createdAt).toLocaleString('fr-CA')}`,
     `Milieu : ${r.milieu.nom} (${r.milieu.type||'type non précisé'}) – ${r.milieu.contact} – ${r.milieu.tel}`,
+    `Brigade : ${r.milieu.brigade ? brigadeLabel(r.milieu.brigade) : '—'}`,
     `Enfant : ${r.enfant.age} ${r.enfant.ageunit}${r.enfant.debut?` – début ${r.enfant.debut}`:''}`,
     `Autres cas semblables : ${r.enfant.autres||'0'}`,
     `Moment : ${CTX[r.fievre.context]||'—'}`,
@@ -602,6 +641,24 @@ async function copyText(t, btn){
 
 $('#copyBtn').addEventListener('click', e=>{ const {f,ev}=refresh(); copyText(summary(record(f,ev)), e.currentTarget); });
 
+/* ---------- base de données (Supabase) ---------- */
+const isExample = f => (f.notes||'').startsWith('EXEMPLE');
+async function dbSave(rec, envoye){
+  const row = {
+    session_id: rec.id, envoye: !!envoye,
+    brigade: rec.milieu.brigade || null, milieu: rec.milieu.nom || null, type_milieu: rec.milieu.type || null,
+    contact: rec.milieu.contact || null, telephone: rec.milieu.tel || null,
+    age: rec.enfant.age ? rec.enfant.age+' '+rec.enfant.ageunit : null,
+    recommandation: PILL[rec.verdict.state][1], priorite: rec.priorite,
+    diagnostic: rec.diagnostic && rec.diagnostic.maladie ? rec.diagnostic.maladie : null,
+    motifs: (rec.verdict.reasons||[]).map(k=>REASONS[k].t).join(' | ') || null,
+    resume: summary(rec), donnees: rec
+  };
+  const res = await fetch(CONFIG.supabaseUrl.replace(/\/+$/,'') + '/rest/v1/' + encodeURIComponent(CONFIG.supabaseTable), {
+    method:'POST', headers:{'apikey':CONFIG.supabaseKey,'Content-Type':'application/json','Prefer':'return=minimal'}, body: JSON.stringify(row)
+  });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+}
 form.addEventListener('submit', async e=>{
   e.preventDefault(); clearInvalid();
   const {f, ev} = refresh();
@@ -609,6 +666,15 @@ form.addEventListener('submit', async e=>{
   if(bad.length){ const err=$('#formErr'); err.hidden=false; err.textContent = 'Complétez : '+bad.map(b=>b==='question'?"les questions sur l'état de l'enfant":b).join(', ')+'.'; return; }
   const rec = record(f, ev);
   const contact = CONFIG.contactBrigade ? `<p>Brigade : <b>${esc(CONFIG.contactBrigade)}</b></p>` : '';
+  if(isExample(f)){ lastSent = `<div class="sent"><h3>Exemple</h3><p>Ceci est une fiche d'exemple : rien n'a été envoyé ni enregistré.</p></div>`; refresh(); return; }
+  if(DB_ON){
+    const btn=$('#submitBtn'); btn.disabled=true; btn.textContent='Envoi…';
+    try{ await dbSave(rec, true);
+      lastSent = `<div class="sent"><h3>Signalement envoyé à la brigade</h3><p>Envoyé le ${esc(new Date(rec.createdAt).toLocaleString('fr-CA'))}. Suivez la recommandation ci-dessus en attendant que la brigade vous contacte au besoin.</p></div>`;
+    }catch(err){ lastSent = `<div class="sent"><h3>Signalement non envoyé</h3><p>L'envoi n'a pas fonctionné. Vérifiez votre connexion et réessayez, ou copiez ce résumé et transmettez-le à la brigade.</p>${contact}<pre class="summary">${esc(summary(rec))}</pre></div>`; }
+    finally{ btn.disabled=false; btn.textContent='Envoyer à la brigade'; refresh(); }
+    return;
+  }
   if(!CONFIG.submitUrl){
     lastSent = `<div class="sent"><h3>Transmettez ce résumé à la brigade</h3>${contact}<pre class="summary">${esc(summary(rec))}</pre></div>`;
     refresh(); return;
@@ -627,9 +693,10 @@ form.addEventListener('submit', async e=>{
 });
 
 $('#resetBtn').addEventListener('click', ()=>{
-  const keep = {type:read().type, nom:form.elements.nom.value, contact:form.elements.contact.value, tel:form.elements.tel.value};
-  form.reset(); lastSent=null;
+  const keep = {type:read().type, nom:form.elements.nom.value, contact:form.elements.contact.value, tel:form.elements.tel.value, brigade:(form.elements.brigade||{}).value||''};
+  form.reset(); lastSent=null; SESSION = newSession();
   ['nom','contact','tel'].forEach(k=>form.elements[k].value=keep[k]);
+  if(form.elements.brigade) form.elements.brigade.value = URL_BRIGADE || keep.brigade;
   if(keep.type){ const r=form.querySelector(`input[name=type][value="${CSS.escape(keep.type)}"]`); if(r) r.checked=true; }
   clearInvalid(); refresh(); window.scrollTo({top:0});
 });
@@ -646,8 +713,9 @@ $('#exampleBtn').addEventListener('click', ()=>{
 });
 
 /* ---------- boot ---------- */
-fillDiag(); loadMilieu(); refresh();
-if(!CONFIG.submitUrl){ const o=$('#offline'); o.hidden=false; o.textContent = "L'envoi automatique n'est pas encore activé. Après avoir répondu, copiez le résumé et transmettez-le à la brigade"+(CONFIG.contactBrigade?' ('+CONFIG.contactBrigade+').':'.'); }
+fillDiag(); setupBrigade(); loadMilieu(); refresh();
+if(DB_ON){ const o=$('#offline'); o.hidden=false; o.textContent = "Quand vous cliquez sur « Envoyer à la brigade », vos réponses sont enregistrées pour la santé publique. Aucun nom d'enfant n'est demandé."; }
+else if(!CONFIG.submitUrl){ const o=$('#offline'); o.hidden=false; o.textContent = "L'envoi automatique n'est pas encore activé. Après avoir répondu, copiez le résumé et transmettez-le à la brigade"+(CONFIG.contactBrigade?' ('+CONFIG.contactBrigade+').':'.'); }
 })();
 </script>
 </body>
