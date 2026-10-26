@@ -11,7 +11,7 @@
 /* Layout: form column on the left, live recommendation panel pinned on the right (stacks with a bottom status bar on phones) */
 :root{
   --bg:#F1F4F8; --surface:#FFFFFF; --sunk:#E8EDF4; --ink:#223654; --muted:#4E5A6B; --line:#C9D1DD;
-  --accent:#095797; --accent-ink:#FFFFFF; --accent-soft:#DCE8F5; --band:#095797; --band-ink:#FFFFFF;
+  --accent:#095797; --accent-ink:#FFFFFF; --accent-soft:#DCE8F5; --band:#095797; --band-ink:#FFFFFF; --flag:#6B3FA0; --flag-bg:#F2ECF9;
   --stop:#B03C26; --stop-bg:#FBE8E3; --go:#2A7546; --go-bg:#E3F2E8; --wait:#9A6200; --wait-bg:#FBF0D8;
   --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --f-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -20,12 +20,12 @@
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0E1622; --surface:#16202E; --sunk:#111A26; --ink:#E3E9F1; --muted:#9AA8BA; --line:#2A3647;
-  --accent:#6FA8DC; --accent-ink:#06192B; --accent-soft:#1A2D45; --band:#0B4A7F; --band-ink:#FFFFFF;
+  --accent:#6FA8DC; --accent-ink:#06192B; --accent-soft:#1A2D45; --band:#0B4A7F; --band-ink:#FFFFFF; --flag:#C6A6EF; --flag-bg:#271D36;
   --stop:#F08B72; --stop-bg:#3A1D17; --go:#72CC94; --go-bg:#15301F; --wait:#E9B65A; --wait-bg:#33270E;
   color-scheme:dark;}}
 :root[data-theme="dark"]{
   --bg:#0E1622; --surface:#16202E; --sunk:#111A26; --ink:#E3E9F1; --muted:#9AA8BA; --line:#2A3647;
-  --accent:#6FA8DC; --accent-ink:#06192B; --accent-soft:#1A2D45; --band:#0B4A7F; --band-ink:#FFFFFF;
+  --accent:#6FA8DC; --accent-ink:#06192B; --accent-soft:#1A2D45; --band:#0B4A7F; --band-ink:#FFFFFF; --flag:#C6A6EF; --flag-bg:#271D36;
   --stop:#F08B72; --stop-bg:#3A1D17; --go:#72CC94; --go-bg:#15301F; --wait:#E9B65A; --wait-bg:#33270E;
   color-scheme:dark;}
 
@@ -127,6 +127,12 @@ aside.verdict{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 16px);dis
 .card li.hl{font-weight:700}
 .tag{color:var(--muted);font-weight:400;font-style:italic;margin-left:4px;white-space:nowrap}
 .small{font-size:13px;color:var(--muted);margin:0}
+.flagcard{background:var(--flag-bg);border:1px solid var(--flag);border-radius:var(--r);padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.flagcard .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--flag)}
+.flagcard h3{font-size:20px;color:var(--flag)}
+.flagcard p{margin:0}
+.pill.mado{background:var(--flag);color:var(--surface)}
+
 .missing{font-size:14px;color:var(--muted)}
 
 .sent{background:var(--surface);border:2px solid var(--accent);border-radius:var(--r);padding:18px 20px;display:flex;flex-direction:column;gap:10px}
@@ -301,7 +307,27 @@ details.rep > summary::-webkit-details-marker{display:none}
     </fieldset>
 
     <fieldset>
-      <legend><div class="fs-head"><span class="fs-num">5</span><h2>Autres informations</h2></div></legend>
+      <legend><div class="fs-head"><span class="fs-num">5</span><h2>Diagnostic</h2></div></legend>
+      <p class="fs-sub">Le diagnostic ne change pas la recommandation temporaire. Il permet à la brigade de prioriser le signalement et de vérifier s'il existe des consignes propres à la maladie.</p>
+      <div class="field">
+        <span class="qlabel">Un professionnel de la santé a-t-il posé un diagnostic?</span>
+        <div class="chips" id="f-diag">
+          <label class="chip"><input type="radio" name="diag" value="oui"><span>Oui</span></label>
+          <label class="chip"><input type="radio" name="diag" value="non"><span>Non</span></label>
+          <label class="chip"><input type="radio" name="diag" value="attente"><span>Consultation à venir</span></label>
+        </div>
+      </div>
+      <div class="row" id="diagRow" hidden>
+        <div class="field"><label for="f-maladie">Diagnostic</label>
+          <select id="f-maladie" name="maladie"><option value="">Choisir…</option></select>
+          <span class="hint">Les maladies à déclaration obligatoire (MADO) sont regroupées en haut de la liste.</span>
+        </div>
+        <div class="field" id="autreRow" hidden><label for="f-maladie-autre">Préciser le diagnostic</label><input type="text" id="f-maladie-autre" name="maladieAutre"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><div class="fs-head"><span class="fs-num">6</span><h2>Autres informations</h2></div></legend>
       <div class="field"><label for="f-notes">Symptômes observés, diagnostic connu, questions pour la brigade</label><textarea id="f-notes" name="notes" placeholder="Ex. : toux, éruption sur le tronc, diagnostic de gastro-entérite par le médecin…"></textarea></div>
     </fieldset>
 
@@ -367,6 +393,23 @@ const RETURN = [
 const QS = ["etat","vomit","diarrhee","lesions","consigne"];
 const CTX = {maison:"Le matin, à la maison", garde:"Au milieu de garde", ecole:"À l'école"};
 
+/* Maladies à déclaration obligatoire (MADO) pertinentes en milieu de garde.
+   Source : listes MADO du MSSS (médecins et laboratoires). Ajouter ou retirer des noms ici. */
+const MADO = ["Coqueluche","Cryptosporidiose","Diphtérie","Fièvre typhoïde ou paratyphoïde","Giardiase","Hépatite A","Infection à Campylobacter","Infection à E. coli producteur de shigatoxines (incluant SHU)","Infection à Yersinia","Infection invasive à Haemophilus influenzae","Infection invasive à méningocoque","Infection invasive à pneumocoque","Infection invasive à streptocoque du groupe A","Oreillons","Poliomyélite","Rougeole","Rubéole","Salmonellose","Shigellose","Tuberculose"];
+/* Autres diagnostics fréquents (non MADO). */
+const AUTRES = ["Bronchiolite","Cinquième maladie","Conjonctivite","COVID-19","Gale","Gastro-entérite","Impétigo","Influenza (grippe)","Otite","Pharyngite à streptocoque","Pieds-mains-bouche","Poux","Roséole","Varicelle"];
+function fillDiag(){
+  const sel = $('#f-maladie'); if(!sel) return;
+  const grp = (label, items) => { const g=document.createElement('optgroup'); g.label=label; items.forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; g.appendChild(o); }); sel.appendChild(g); };
+  grp('Maladies à déclaration obligatoire (MADO)', MADO);
+  grp('Autres maladies fréquentes', AUTRES);
+  const o=document.createElement('option'); o.value='autre'; o.textContent='Autre (préciser)'; sel.appendChild(o);
+}
+function diagInfo(f){
+  const name = f.maladie==='autre' ? (f.maladieAutre||'') : (f.maladie||'');
+  return {statut:f.diag||'', maladie: f.diag==='oui' ? name : '', mado: f.diag==='oui' && MADO.includes(f.maladie)};
+}
+
 function read(){ const o={}; for(const [k,v] of new FormData(form)) o[k]=typeof v==='string'?v.trim():v; return o; }
 function num(v){ if(v==null||v==='') return NaN; return parseFloat(String(v).replace(',','.')); }
 function ageMonths(f){ const a=num(f.age); if(isNaN(a)) return NaN; return f.ageunit==='mois'? a : a*12; }
@@ -407,13 +450,16 @@ function evaluate(f){
   QS.forEach(q => { if(f[q]==='oui') reasons.push(q); else if(f[q]!=='non') missing.push(null); });
   const unanswered = QS.filter(q=>!f[q]).length;
   if(unanswered) missing.push(unanswered===1 ? "1 des autres critères" : unanswered+" des autres critères");
+  const dx = diagInfo(f);
+  if(!f.diag) missing.push("si un diagnostic a été posé");
+  else if(f.diag==='oui' && !dx.maladie) missing.push("le diagnostic");
   const miss = missing.filter(Boolean);
   let state;
   if(reasons.length) state='stop';
   else if(pending) state='wait';
   else if(miss.length) state='idle';
   else state='go';
-  return {state, reasons, missing:miss, notes, pending, fever, fever2, months:m};
+  return {state, reasons, missing:miss, notes, pending, fever, fever2, months:m, dx};
 }
 
 /* ---------- UI: form reactivity ---------- */
@@ -434,10 +480,13 @@ function syncForm(f, ev){
     flag.textContent = (ev.fever ? 'Fièvre selon la définition' : 'Pas de fièvre selon la définition') + ' · seuil : ' + seuil;
   } else if(ev.fever==='route'){ flag.hidden=false; flag.className='feverflag warn'; flag.textContent='Voie non valide pour cet âge'; }
   else flag.hidden=true;
+  $('#diagRow').hidden = f.diag!=='oui';
+  $('#autreRow').hidden = !(f.diag==='oui' && f.maladie==='autre');
   $('#contextRow').hidden = !(f.mesure==='oui' && ev.fever===true);
   $('#recheck').hidden = !(f.mesure==='oui' && ev.fever===true && f.context==='garde' && m>=3);
 }
 
+function CONFIG_CONTACT(){ return CONFIG.contactBrigade ? ' Vous pouvez aussi joindre la brigade : <b>'+esc(CONFIG.contactBrigade)+'</b>.' : ''; }
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function verdictHTML(f, ev){
@@ -456,6 +505,15 @@ function verdictHTML(f, ev){
   } else {
     h+=`<div class="status idle"><span class="label">Recommandation</span><h3>Répondez aux questions</h3><p>La recommandation se met à jour à chaque réponse. Une seule réponse « oui » suffit pour exclure l'enfant.</p></div>`;
   }
+  const dx = ev.dx; let dxh='';
+  if(dx.mado){
+    dxh+=`<div class="flagcard"><span class="label">Priorité · maladie à déclaration obligatoire</span><h3>${esc(dx.maladie)}</h3><p>Ce diagnostic est une maladie à déclaration obligatoire (MADO). Le signalement sera marqué <b>prioritaire</b> pour la brigade. La santé publique pourrait demander des mesures supplémentaires (par exemple : durée d'exclusion différente, avis aux parents, vérification de la vaccination).</p><p>En attendant, appliquez la recommandation ci-dessus et envoyez le signalement sans tarder.${CONFIG_CONTACT()}</p></div>`;
+  } else if(dx.statut==='oui' && dx.maladie){
+    dxh+=`<div class="card"><h4>Diagnostic indiqué</h4><p style="margin:0"><b>${esc(dx.maladie)}</b>. La brigade vérifiera s'il existe des consignes propres à cette maladie et vous recontactera au besoin. Suivez aussi les consignes du professionnel de la santé.</p></div>`;
+  } else if(dx.statut==='attente'){
+    dxh+=`<div class="card"><h4>Diagnostic à venir</h4><p style="margin:0">Si un diagnostic est posé, informez la brigade ou faites un nouveau signalement.</p></div>`;
+  }
+  if(dxh){ const k=h.indexOf('</div>')+6; h=h.slice(0,k)+dxh+h.slice(k); }
   if(ev.notes.length) h+=`<div class="card"><h4>À noter</h4><ul>${ev.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`;
   if(ev.missing.length && ev.state!=='idle') h+=`<p class="missing">Il manque encore : ${esc(ev.missing.join(', '))}.</p>`;
   else if(ev.missing.length) h+=`<p class="missing">À compléter : ${esc(ev.missing.join(', '))}.</p>`;
@@ -496,6 +554,8 @@ function validate(f, ev){
   if(ev.fever===true && !f.context) bad.push('où la fièvre a été remarquée');
   if(!f.mesure) bad.push('température prise ou non');
   if(f.mesure==='oui' && (isNaN(num(f.temp))||!f.voie)) bad.push('température et voie');
+  if(!f.diag) bad.push('diagnostic posé ou non');
+  else if(f.diag==='oui' && !ev.dx.maladie) bad.push('le diagnostic');
   QS.forEach(q=>{ if(!f[q]){ bad.push('question'); const el=form.querySelector(`.q[data-q="${q}"]`); if(el) el.classList.add('invalid'); } });
   return [...new Set(bad)];
 }
@@ -507,6 +567,8 @@ function record(f, ev){
     enfant:{age:f.age, ageunit:f.ageunit, debut:f.debut||'', autres:f.autres||''},
     fievre:{context: ev.fever===true ? f.context : '', mesure:f.mesure, temp:f.temp||'', voie:f.voie||'', aceta:f.aceta||'', temp2:f.temp2||'', fever:ev.fever, fever2:ev.fever2},
     reponses:Object.fromEntries(QS.map(q=>[q,f[q]||''])),
+    diagnostic: ev.dx,
+    priorite: ev.dx.mado ? 'MADO' : 'standard',
     notes:f.notes||'',
     verdict:{state:ev.state, reasons:ev.reasons, notes:ev.notes}
   };
@@ -515,6 +577,7 @@ function summary(r){
   const yn = v => v==='oui'?'Oui':v==='non'?'Non':'—';
   const temp = r.fievre.mesure==='oui' ? `${r.fievre.temp} °C (${r.fievre.voie})${r.fievre.temp2?` · 1 h après : ${r.fievre.temp2} °C`:''}${r.fievre.aceta?` · acétaminophène : ${r.fievre.aceta==='oui'?'oui':'non'}`:''}` : 'non prise';
   return [
+    ...(r.diagnostic&&r.diagnostic.mado ? [`*** PRIORITÉ – MADO : ${r.diagnostic.maladie} (indiqué par le milieu, à vérifier) ***`] : []),
     `SIGNALEMENT – ${new Date(r.createdAt).toLocaleString('fr-CA')}`,
     `Milieu : ${r.milieu.nom} (${r.milieu.type||'type non précisé'}) – ${r.milieu.contact} – ${r.milieu.tel}`,
     `Enfant : ${r.enfant.age} ${r.enfant.ageunit}${r.enfant.debut?` – début ${r.enfant.debut}`:''}`,
@@ -526,6 +589,7 @@ function summary(r){
     `Diarrhée non contenue / sang / mucus / incontinent : ${yn(r.reponses.diarrhee)}`,
     `Lésions avec pus non couvrables : ${yn(r.reponses.lesions)}`,
     `Consigne d'un professionnel : ${yn(r.reponses.consigne)}`,
+    `Diagnostic : ${!r.diagnostic||!r.diagnostic.statut?'—':r.diagnostic.statut==='oui'?(r.diagnostic.maladie+(r.diagnostic.mado?' (MADO)':'')):r.diagnostic.statut==='attente'?'consultation à venir':'aucun'}`,
     `Notes : ${r.notes||'—'}`,
     `RECOMMANDATION TEMPORAIRE : ${PILL[r.verdict.state][1]}${r.verdict.reasons.length?' – '+r.verdict.reasons.map(k=>REASONS[k].t).join('; '):''}`
   ].join('\n');
@@ -576,13 +640,13 @@ $('#exampleBtn').addEventListener('click', ()=>{
   set('age','2'); set('ageunit','ans'); set('autres','1');
   set('context','garde'); set('mesure','oui'); refresh(); set('temp','38.9'); set('voie','rectum'); refresh();
   set('aceta','oui'); set('temp2','');
-  set('etat','non'); set('vomit','non'); set('diarrhee','non'); set('lesions','non'); set('consigne','non');
+  set('etat','non'); set('vomit','non'); set('diarrhee','non'); set('lesions','non'); set('consigne','non'); set('diag','non');
   set('notes','EXEMPLE – fiche fictive pour démonstration, ne pas envoyer.');
   lastSent=null; refresh();
 });
 
 /* ---------- boot ---------- */
-loadMilieu(); refresh();
+fillDiag(); loadMilieu(); refresh();
 if(!CONFIG.submitUrl){ const o=$('#offline'); o.hidden=false; o.textContent = "L'envoi automatique n'est pas encore activé. Après avoir répondu, copiez le résumé et transmettez-le à la brigade"+(CONFIG.contactBrigade?' ('+CONFIG.contactBrigade+').':'.'); }
 })();
 </script>
