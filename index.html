@@ -236,6 +236,16 @@ details.def summary{color:var(--ink)}
 .pill.s-new{background:var(--band);color:var(--ink)}
 .pill.mado{background:var(--flag);color:#FFFFFF}
 .chip span,.btn,input,select,textarea,pre.summary,.feverflag,.subpanel,.tab .count{border-radius:0}
+.acbox{background:var(--surface);border:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.acq{display:flex;flex-direction:column;gap:6px}
+.aclink{color:var(--accent);font-weight:700}
+.acout{padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.acout p,.acout ul{margin:0}
+.acout ul{padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.acout.ok{background:var(--non);border:1px solid var(--non-line)}
+.acout.no{background:var(--salmon);border:1px solid var(--oui-line)}
+.acout .label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.acout .dose{font-size:30px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -323,11 +333,29 @@ details.def summary{color:var(--ink)}
       </div>
 
       <div class="subpanel" id="recheck" hidden>
-        <p style="margin:0"><b>Enfant de 3 mois et plus avec fièvre au milieu de garde :</b> si indiqué, donnez de l'acétaminophène selon le protocole, puis reprenez la température 1 heure après, par la même voie.</p>
+        <p style="margin:0"><b>Enfant de 3 mois et plus avec fièvre au milieu de garde :</b> prévenez le parent, habillez l'enfant légèrement et faites-le boire plus souvent. Si le protocole le permet, donnez de l'acétaminophène, puis reprenez la température 1 heure après, par la même voie.</p>
+        <div class="acbox" id="acbox">
+          <div class="achead"><b>Protocole d'acétaminophène</b> <span class="hint">(ministère de la Famille, FO-0647)</span><br><a class="aclink" href="https://cdn-contenu.quebec.ca/cdn-contenu/adm/min/famille/publications-adm/Service_de_garde/sante-securite/SGEE_protocole_acetaminophene.pdf" target="_blank" rel="noopener">Lire le protocole complet (PDF, 6 pages)</a> <span class="hint">: à lire au moins une fois avant de l'appliquer.</span></div>
+          <div class="acq"><span>Le parent a-t-il signé le formulaire d'autorisation du protocole?</span>
+            <div class="chips"><label class="chip"><input type="radio" name="ac_form" value="oui"><span>Oui</span></label><label class="chip"><input type="radio" name="ac_form" value="non"><span>Non</span></label></div></div>
+          <div class="acq"><span>L'enfant a-t-il une allergie connue à l'acétaminophène?</span>
+            <div class="chips"><label class="chip"><input type="radio" name="ac_allergie" value="oui"><span>Oui</span></label><label class="chip"><input type="radio" name="ac_allergie" value="non"><span>Non</span></label></div></div>
+          <div class="acq"><span>A-t-il reçu de l'acétaminophène, ou un médicament qui en contient (ex. : sirop contre la toux), dans les 4 dernières heures?</span>
+            <div class="chips"><label class="chip"><input type="radio" name="ac_4h" value="oui"><span>Oui</span></label><label class="chip"><input type="radio" name="ac_4h" value="non"><span>Non</span></label><label class="chip"><input type="radio" name="ac_4h" value="inconnu"><span>Je ne sais pas</span></label></div></div>
+          <div class="acq"><span>Reçoit-il de l'acétaminophène pour cette fièvre depuis plus de 48 heures?</span>
+            <div class="chips"><label class="chip"><input type="radio" name="ac_48h" value="oui"><span>Oui</span></label><label class="chip"><input type="radio" name="ac_48h" value="non"><span>Non</span></label></div></div>
+          <div class="row">
+            <div class="field"><label for="f-ac-poids">Poids inscrit au formulaire (kg)</label><input type="number" class="mono" id="f-ac-poids" name="ac_poids" min="2" max="80" step="0.1" inputmode="decimal"><span class="hint">Le poids doit avoir été revalidé avec le parent il y a 3 mois ou moins.</span></div>
+            <div class="field"><label for="f-ac-conc">Concentration du produit</label>
+              <select id="f-ac-conc" name="ac_conc"><option value="">Choisir…</option><option value="80/1">80 mg / 1 ml (gouttes)</option><option value="80/5">80 mg / 5 ml</option><option value="160/5">160 mg / 5 ml</option></select>
+              <span class="hint">Lisez-la sur le contenant.</span></div>
+          </div>
+          <div id="acResult" aria-live="polite"></div>
+        </div>
         <div class="field"><span class="qlabel">Acétaminophène donné?</span>
           <div class="chips">
             <label class="chip"><input type="radio" name="aceta" value="oui"><span>Oui, selon le protocole</span></label>
-            <label class="chip"><input type="radio" name="aceta" value="non-indique"><span>Non indiqué / non donné</span></label>
+            <label class="chip"><input type="radio" name="aceta" value="non-indique"><span>Non (protocole ne s'applique pas ou non indiqué)</span></label>
           </div>
         </div>
         <div class="field"><label for="f-temp2">Température 1 heure après (°C)</label><input type="number" class="mono" id="f-temp2" name="temp2" min="34" max="43" step="0.1" inputmode="decimal" style="max-width:160px"><span class="hint">Laissez vide si l'heure n'est pas encore passée.</span></div>
@@ -506,7 +534,8 @@ function evaluate(f){
     if(fever===null) missing.push("la température et la voie");
     else if(fever==='noage') missing.push("l'âge de l'enfant");
     else if(fever==='route') notes.push(m<3 ? "Moins de 3 mois : seule la température rectale est définie. Reprenez-la par le rectum." : "La voie buccale s'applique seulement à 5 ans et plus. Reprenez la température par le rectum ou l'aisselle.");
-    else if(fever===true && !f.context) missing.push("où la fièvre a été remarquée");
+    else if(fever===true && f.voie==='aisselle') notes.push("Température à l'aisselle : vous pouvez la confirmer par le rectum, plus fiable.");
+    if(fever===true && !f.context) missing.push("où la fièvre a été remarquée");
     else if(fever===true){
       if(f.context==='maison') reasons.push('fever_home');
       else if(f.context==='ecole') reasons.push('fever_school');
@@ -558,6 +587,7 @@ function syncForm(f, ev){
   $('#autreRow').hidden = !(f.diag==='oui' && f.maladie==='autre');
   $('#contextRow').hidden = !(f.mesure==='oui' && ev.fever===true);
   $('#recheck').hidden = !(f.mesure==='oui' && ev.fever===true && f.context==='garde' && m>=3);
+  if(!$('#recheck').hidden) $('#acResult').innerHTML = acHTML(acEval(f));
 }
 
 
@@ -578,6 +608,42 @@ function setupBrigade(){
     hint.textContent = 'Si vous la connaissez.';
   }
 }
+
+/* ---------- protocole d'acétaminophène (ministère de la Famille, FO-0647 01-2025) ----------
+   Une ligne par tranche de poids : [poids min kg, poids max kg, ml à 80 mg/1 ml, ml à 80 mg/5 ml, ml à 160 mg/5 ml]
+   Dose maximale 15 mg/kg/dose. Répéter aux 4 à 6 heures. Maximum 5 doses par 24 heures. */
+const AC_TABLE = [
+  [4.3,5.3,0.8,4,2.0],[5.4,6.3,1.0,5,2.5],[6.4,7.4,1.2,6,3.0],[7.5,8.5,1.4,7,3.5],[8.6,9.5,1.6,8,4.0],
+  [9.6,10.6,1.8,9,4.5],[10.7,11.7,2.0,10,5.0],[11.8,12.7,2.2,11,5.5],[12.8,13.8,2.4,12,6.0],[13.9,14.9,2.6,13,6.5],
+  [15.0,15.9,2.8,14,7.0],[16.0,17.0,3.0,15,7.5],[17.1,18.1,3.2,16,8.0],[18.2,19.1,3.4,17,8.5],[19.2,20.2,3.6,18,9.0],
+  [20.3,21.3,3.8,19,9.5],[21.4,22.3,4.0,20,10.0],[22.4,23.4,4.2,21,10.5],[23.5,24.5,4.4,22,11.0],[24.6,25.5,4.6,23,11.5],
+  [25.6,26.6,4.8,24,12.0],[26.7,27.7,5.0,25,12.5],[27.8,28.7,5.2,26,13.0],[28.8,29.8,5.4,27,13.5],[29.9,30.9,5.6,28,14.0],
+  [31.0,31.9,5.8,29,14.5],[32.0,33.0,6.0,30,15.0],[33.1,34.1,6.2,31,15.5],[34.2,35.1,6.4,32,16.0]
+];
+const AC_COL = {"80/1":2, "80/5":3, "160/5":4};
+const AC_LABEL = {"80/1":"80 mg / 1 ml", "80/5":"80 mg / 5 ml", "160/5":"160 mg / 5 ml"};
+const fmtMl = v => String(v).replace('.', ',');
+function acEval(f){
+  const block=[];
+  if(f.ac_form==='non') block.push("le parent n'a pas signé le formulaire d'autorisation");
+  if(f.ac_allergie==='oui') block.push("allergie connue à l'acétaminophène");
+  if(f.ac_4h==='oui') block.push("acétaminophène (ou médicament qui en contient) reçu dans les 4 dernières heures");
+  if(f.ac_4h==='inconnu') block.push("on ne sait pas si un médicament contenant de l'acétaminophène a été donné dans les 4 dernières heures : vérifiez avec le parent");
+  if(f.ac_48h==='oui') block.push("acétaminophène donné depuis plus de 48 heures");
+  if(block.length) return {state:'no', block};
+  if(!f.ac_form || !f.ac_allergie || !f.ac_4h || !f.ac_48h) return {state:'incomplete'};
+  const w = Math.floor(num(f.ac_poids)*10 + 1e-9)/10; /* arrondi vers le bas : ne jamais choisir une tranche plus lourde */
+  if(isNaN(w) || !f.ac_conc) return {state:'incomplete', need:'le poids et la concentration'};
+  const row = AC_TABLE.find(r => w>=r[0] && w<=r[1]);
+  if(!row) return {state:'outside', w};
+  return {state:'ok', w, conc:f.ac_conc, ml: row[AC_COL[f.ac_conc]], range:[row[0],row[1]]};
+}
+function acHTML(a){
+  if(a.state==='no') return `<div class="acout no"><b>Ne pas donner d'acétaminophène selon le protocole.</b><ul>${a.block.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><p>Il faudrait l'autorisation écrite d'un professionnel de la santé et du parent. Surveillez l'enfant et reprenez la température dans 1 heure.</p></div>`;
+  if(a.state==='outside') return `<div class="acout no"><b>Le poids inscrit (${fmtMl(a.w)} kg) n'est pas dans le tableau du protocole (4,3 à 35,1 kg).</b><p>Ne donnez pas d'acétaminophène selon le protocole. Vérifiez le poids avec le parent ou demandez l'avis d'un professionnel de la santé.</p></div>`;
+  if(a.state==='ok') return `<div class="acout ok"><span class="label">Dose selon le tableau du protocole</span><div class="dose">${fmtMl(a.conc==='80/5' ? String(a.ml) : a.ml.toFixed(1))} ml</div><p>de ${AC_LABEL[a.conc]}, pour un poids de ${fmtMl(a.range[0])} à ${fmtMl(a.range[1])} kg.</p><ul><li>Vérifiez le nom du produit (acétaminophène seul), la concentration et la date d'expiration sur le contenant.</li><li>Mesurez avec une seringue orale ou un compte-gouttes gradué en ml. Jamais de cuillère de cuisine.</li><li>Ne jamais dépasser cette dose. Au moins 4 heures entre deux doses, maximum 5 doses par 24 heures.</li><li>Inscrivez la dose et l'heure à la fiche de l'enfant et informez le parent le jour même.</li></ul><p class="small">Dose trop élevée donnée par erreur : appelez immédiatement le Centre antipoison du Québec, <b>1 800 463-5060</b>, et avisez le parent.</p></div>`;
+  return `<p class="small">${a.need ? 'Indiquez '+esc(a.need)+' pour voir la dose.' : 'Répondez aux questions pour savoir si l\'acétaminophène peut être donné.'}</p>`;
+}
 function CONFIG_CONTACT(){ return CONFIG.contactBrigade ? ' Vous pouvez aussi joindre la brigade : <b>'+esc(CONFIG.contactBrigade)+'</b>.' : ''; }
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -586,6 +652,8 @@ function verdictHTML(f, ev){
   if(ev.state==='stop'){
     const home = f.context==='maison';
     h+=`<div class="status stop"><span class="label">Recommandation temporaire</span><h3>Exclure l'enfant du milieu</h3><p>${home?"L'enfant doit rester à la maison.":"Appelez le parent pour qu'il vienne chercher l'enfant. L'enfant reste à la maison jusqu'à ce que les conditions de retour soient remplies."}</p></div>`;
+    if(ev.reasons.includes('fever_infant')) h+=`<div class="card ret"><h4>Enfant de moins de 3 mois</h4><ul><li><b>Prévenez immédiatement le parent</b> et demandez-lui de venir chercher l'enfant. Une consultation médicale est nécessaire.</li><li>Ne donnez pas d'acétaminophène sans l'autorisation d'un professionnel de la santé et du parent.</li><li>Habillez l'enfant légèrement, faites-le boire plus souvent et reprenez la température après 60 minutes, ou plus tôt si son état se détériore.</li><li>Si personne ne peut être joint, conduisez l'enfant à l'urgence d'un centre hospitalier.</li></ul></div>`;
+    else if(!home) h+=`<p class="small" style="color:var(--ink)">Si vous ne pouvez pas joindre le parent, appelez les personnes désignées en cas d'urgence. Si personne ne peut être joint, conduisez l'enfant à l'urgence d'un centre hospitalier.</p>`;
     h+=`<div class="card"><h4>Pourquoi</h4><ul>${ev.reasons.map(r=>`<li>${esc(REASONS[r].t)}</li>`).join('')}</ul></div>`;
     const keys = new Set(ev.reasons.map(r=>REASONS[r].r));
     h+=`<div class="card ret"><h4>Retour permis quand toutes ces conditions sont remplies</h4><ul>${RETURN.map(([k,t])=>`<li class="${keys.has(k)?'hl':''}">${esc(t)}${keys.has(k)?' <span class="tag">(applicable)</span>':''}</li>`).join('')}</ul></div>`;
@@ -658,7 +726,7 @@ function record(f, ev){
     createdAt: new Date().toISOString(),
     milieu:{type:f.type||'',nom:f.nom,contact:f.contact||'',tel:f.tel,brigade:f.brigade||''},
     enfant:{age:f.age, ageunit:f.ageunit, debut:f.debut||'', autres:f.autres||''},
-    fievre:{context: ev.fever===true ? f.context : '', mesure:f.mesure, temp:f.temp||'', voie:f.voie||'', aceta:f.aceta||'', temp2:f.temp2||'', fever:ev.fever, fever2:ev.fever2},
+    fievre:{context: ev.fever===true ? f.context : '', mesure:f.mesure, temp:f.temp||'', voie:f.voie||'', aceta:f.aceta||'', acetaminophene: (f.context==='garde' && ev.fever===true && ev.months>=3) ? {formulaire:f.ac_form||'', allergie:f.ac_allergie||'', recu4h:f.ac_4h||'', plus48h:f.ac_48h||'', poids:f.ac_poids||'', concentration:f.ac_conc||'', resultat:(a=>a.state==='ok'?`${a.ml} ml (${AC_LABEL[a.conc]})`:a.state==='no'?'protocole ne s\'applique pas':a.state==='outside'?'poids hors tableau':'')(acEval(f))} : null, temp2:f.temp2||'', fever:ev.fever, fever2:ev.fever2},
     reponses:Object.fromEntries(QS.map(q=>[q,f[q]||''])),
     diagnostic: ev.dx,
     priorite: ev.dx.mado ? 'MADO' : 'standard',
@@ -678,6 +746,7 @@ function summary(r){
     `Autres cas semblables : ${r.enfant.autres||'0'}`,
     `Moment : ${CTX[r.fievre.context]||'—'}`,
     `Température : ${temp}`,
+    ...(r.fievre.acetaminophene && r.fievre.acetaminophene.resultat ? [`Protocole acétaminophène : ${r.fievre.acetaminophene.resultat}${r.fievre.acetaminophene.poids?' – poids '+r.fievre.acetaminophene.poids+' kg':''}`] : []),
     `État empêche les activités : ${yn(r.reponses.etat)}`,
     `2 vomissements+ en 24 h : ${yn(r.reponses.vomit)}`,
     `Diarrhée non contenue / sang / mucus / incontinent : ${yn(r.reponses.diarrhee)}`,
@@ -796,6 +865,7 @@ $('#exampleBtn').addEventListener('click', ()=>{
   set('type','CPE'); if(!form.elements.nom.value) set('nom','CPE Exemple'); if(!form.elements.contact.value) set('contact','Personne exemple'); if(!form.elements.tel.value) set('tel','000-000-0000');
   set('age','2'); set('ageunit','ans'); set('autres','1');
   set('context','garde'); set('mesure','oui'); refresh(); set('temp','38.9'); set('voie','rectum'); refresh();
+  set('ac_form','oui'); set('ac_allergie','non'); set('ac_4h','non'); set('ac_48h','non'); set('ac_poids','12.5'); set('ac_conc','80/5');
   set('aceta','oui'); set('temp2','');
   set('etat','non'); set('vomit','non'); set('diarrhee','non'); set('lesions','non'); set('consigne','non'); set('diag','non');
   set('notes','EXEMPLE – fiche fictive pour démonstration, ne pas envoyer.');
