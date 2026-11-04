@@ -4,30 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Exclusion milieu de garde</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
 /* Layout: form column on the left, live recommendation panel pinned on the right (stacks with a bottom status bar on phones) */
 :root{
-  --bg:#F1F4F8; --surface:#FFFFFF; --sunk:#E8EDF4; --ink:#223654; --muted:#4E5A6B; --line:#C9D1DD;
-  --accent:#095797; --accent-ink:#FFFFFF; --accent-soft:#DCE8F5; --band:#095797; --band-ink:#FFFFFF; --flag:#6B3FA0; --flag-bg:#F2ECF9;
-  --stop:#B03C26; --stop-bg:#FBE8E3; --go:#2A7546; --go-bg:#E3F2E8; --wait:#9A6200; --wait-bg:#FBF0D8;
-  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --f-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --r:10px;
+  /* Palette tirée de la fiche « Critères d'exclusion » (25-207-01WFA) */
+  --bg:#FFFFFF; --surface:#FFFFFF; --sunk:#F4F4F4; --ink:#1A1A1A; --muted:#575757; --line:#878787;
+  --accent:#B84A00; --accent-ink:#FFFFFF; --accent-soft:#FDE4D0; --band:#EC6608; --band-ink:#FFFFFF; --flag:#AE1613; --flag-bg:#FFFFFF;
+  --stop:#AE1613; --stop-bg:#F39550; --go:#2E7D27; --go-bg:#B0D199; --wait:#7A5A00; --wait-bg:#FFF4CF;
+  --oui:#F39550; --oui-line:#AE1613; --non:#B0D199; --non-line:#3FA535; --salmon:#FDE4D0; --grey:#E3E3E3; --yellow:#FFD500;
+  --f-display:Arial, Helvetica, sans-serif;
+  --f-body:Arial, Helvetica, sans-serif;
+  --f-mono:Arial, Helvetica, sans-serif;
+  --r:0px;
+  color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0E1622; --surface:#16202E; --sunk:#111A26; --ink:#E3E9F1; --muted:#9AA8BA; --line:#2A3647;
-  --accent:#6FA8DC; --accent-ink:#06192B; --accent-soft:#1A2D45; --band:#0B4A7F; --band-ink:#FFFFFF; --flag:#C6A6EF; --flag-bg:#271D36;
-  --stop:#F08B72; --stop-bg:#3A1D17; --go:#72CC94; --go-bg:#15301F; --wait:#E9B65A; --wait-bg:#33270E;
-  color-scheme:dark;}}
-:root[data-theme="dark"]{
-  --bg:#0E1622; --surface:#16202E; --sunk:#111A26; --ink:#E3E9F1; --muted:#9AA8BA; --line:#2A3647;
-  --accent:#6FA8DC; --accent-ink:#06192B; --accent-soft:#1A2D45; --band:#0B4A7F; --band-ink:#FFFFFF; --flag:#C6A6EF; --flag-bg:#271D36;
-  --stop:#F08B72; --stop-bg:#3A1D17; --go:#72CC94; --go-bg:#15301F; --wait:#E9B65A; --wait-bg:#33270E;
-  color-scheme:dark;}
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -187,14 +177,73 @@ details.rep > summary::-webkit-details-marker{display:none}
 .q.invalid .qlabel{color:var(--stop)}
 
 @media (prefers-reduced-motion:no-preference){.status{transition:background-color .25s ease}}
+
+/* ===== Thème « fiche Critères d'exclusion » : Arial, boîtes carrées, orange / saumon / vert / gris ===== */
+.titlebar{background:var(--band);color:var(--band-ink)}
+.titlebar .wrap{padding-block:16px}
+.titlebar h1{font-size:clamp(22px,3.4vw,30px);font-weight:700;line-height:1.2}
+header.top{background:var(--surface);color:var(--ink);border-bottom:1px solid var(--grey)}
+header.top .eyebrow{color:var(--ink);opacity:1}
+header.top p.lede{color:var(--ink);opacity:1}
+.top .wrap{padding-block:14px;gap:6px}
+.eyebrow{letter-spacing:.03em}
+.tab[aria-selected="true"]{border-bottom-color:var(--band)}
+h1,h2,h3{letter-spacing:0}
+fieldset{border:1px solid var(--line);padding:16px 18px 18px}
+.fs-head{align-items:center}
+.fs-num{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;background:var(--band);color:var(--band-ink);font-weight:700;font-size:15px}
+.fs-head h2{font-size:18px;font-weight:700}
+input[type=text],input[type=tel],input[type=number],input[type=date],select,textarea{background:var(--surface);border:1px solid var(--line)}
+.chip span{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.chip input:checked + span{background:var(--salmon);border-color:var(--band);box-shadow:inset 0 0 0 1px var(--band);color:var(--ink)}
+.q .chip input[value="oui"]:checked + span{background:var(--oui);border-color:var(--oui-line);box-shadow:inset 0 0 0 1px var(--oui-line)}
+.q .chip input[value="non"] + span{border-radius:999px}
+.q .chip input[value="non"]:checked + span{background:var(--non);border-color:var(--non-line);box-shadow:inset 0 0 0 1px var(--non-line)}
+.q{border-top:1px solid var(--grey)}
+.subpanel{border-left:4px solid var(--band);background:var(--salmon)}
+.alert{background:var(--wait-bg);border:1px solid var(--yellow);border-left:6px solid var(--yellow)}
+.alert b{color:var(--ink)}
+.notice{background:var(--grey)}
+details.def{background:var(--grey);color:var(--ink);padding:10px 14px}
+details.def summary{color:var(--ink)}
+.deftable td{border-bottom-color:var(--line)}
+.btn{border:1px solid var(--line)}
+.status{border:1px solid transparent}
+.status h3{font-size:22px}
+.status.stop{background:var(--oui);border-color:var(--oui-line)}
+.status.stop .label,.status.stop h3{color:var(--ink)}
+.status.go{background:var(--non);border-color:var(--non-line)}
+.status.go .label,.status.go h3{color:var(--ink)}
+.status.wait{background:var(--wait-bg);border-color:var(--yellow)}
+.status.wait .label,.status.wait h3{color:var(--ink)}
+.status.idle{background:var(--grey);border-color:var(--grey)}
+.status.idle .label{color:var(--ink)}
+.card{border-color:var(--line)}
+.card h4{color:var(--ink)}
+.card.ret{background:var(--salmon);border-color:var(--oui-line)}
+.tag{color:var(--ink)}
+.flagcard{background:var(--flag-bg);border:2px solid var(--flag)}
+.sent{border:2px solid var(--band)}
+.feverflag{font-weight:700}
+.feverflag.yes{background:var(--salmon);color:var(--stop);border:1px solid var(--oui-line)}
+.feverflag.no{background:var(--non);color:var(--ink);border:1px solid var(--non-line)}
+.feverflag.warn{background:var(--wait-bg);color:var(--ink);border:1px solid var(--yellow)}
+.pill{border-radius:0}
+.pill.stop{background:var(--oui);color:var(--ink)}
+.pill.go{background:var(--non);color:var(--ink)}
+.pill.wait{background:var(--wait-bg);color:var(--ink)}
+.pill.idle{background:var(--grey);color:var(--ink)}
+.pill.s-new{background:var(--band);color:var(--ink)}
+.pill.mado{background:var(--flag);color:#FFFFFF}
+.chip span,.btn,input,select,textarea,pre.summary,.feverflag,.subpanel,.tab .count{border-radius:0}
 </style>
 </head>
 <body>
 
+<div class="titlebar"><div class="wrap"><h1>Exclusion d'un enfant malade</h1></div></div>
 <header class="top">
   <div class="wrap">
     <div class="eyebrow">Milieux de garde et scolaires · Brigade de santé publique</div>
-    <h1>Exclusion d'un enfant malade</h1>
     <p class="lede">Répondez aux questions. Vous obtenez tout de suite une recommandation temporaire basée sur les critères d'exclusion, et votre signalement est transmis à la brigade.</p>
   </div>
 </header>
@@ -353,7 +402,7 @@ details.rep > summary::-webkit-details-marker{display:none}
 <div class="mbar" id="mbar"><span class="pill idle" id="mbarPill">En cours de saisie</span><a href="#verdict" class="linkbtn">Voir la recommandation</a></div>
 
 <script>
-/* ===== CONFIGURATION =====
+/* ===== CONFIGURATION — à remplir par l'équipe web / TI =====
    formsPrefillUrl: lien prérempli Microsoft Forms (bouton « Obtenir l'URL préremplie »),
                     créé en inscrivant MILIEU, TEL, RECO, RESUME et BRIGADE dans les réponses.
                     Rempli = « Envoyer » ouvre ce formulaire avec toutes les réponses déjà inscrites.
@@ -539,7 +588,7 @@ function verdictHTML(f, ev){
     h+=`<div class="status stop"><span class="label">Recommandation temporaire</span><h3>Exclure l'enfant du milieu</h3><p>${home?"L'enfant doit rester à la maison.":"Appelez le parent pour qu'il vienne chercher l'enfant. L'enfant reste à la maison jusqu'à ce que les conditions de retour soient remplies."}</p></div>`;
     h+=`<div class="card"><h4>Pourquoi</h4><ul>${ev.reasons.map(r=>`<li>${esc(REASONS[r].t)}</li>`).join('')}</ul></div>`;
     const keys = new Set(ev.reasons.map(r=>REASONS[r].r));
-    h+=`<div class="card"><h4>Retour permis quand toutes ces conditions sont remplies</h4><ul>${RETURN.map(([k,t])=>`<li class="${keys.has(k)?'hl':''}">${esc(t)}${keys.has(k)?' <span class="tag">(applicable)</span>':''}</li>`).join('')}</ul></div>`;
+    h+=`<div class="card ret"><h4>Retour permis quand toutes ces conditions sont remplies</h4><ul>${RETURN.map(([k,t])=>`<li class="${keys.has(k)?'hl':''}">${esc(t)}${keys.has(k)?' <span class="tag">(applicable)</span>':''}</li>`).join('')}</ul></div>`;
   } else if(ev.state==='wait'){
     h+=`<div class="status wait"><span class="label">À réévaluer</span><h3>Reprendre la température dans 1 heure</h3><p>${esc(ev.pending)}</p><p>Si la fièvre est toujours présente, l'enfant sera exclu. Revenez inscrire la température dans cette fiche.</p></div>`;
   } else if(ev.state==='go'){
