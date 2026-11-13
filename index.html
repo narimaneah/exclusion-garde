@@ -1,0 +1,2845 @@
+<!doctype html>
+<!--
+  =====================================================================
+  OUTIL : EXCLUSION D'UN ENFANT MALADE (milieux de garde et écoles)
+  =====================================================================
+
+  À quoi sert cette page?
+    Le milieu de garde répond à des questions sur un enfant malade.
+    La page applique la fiche « Critères d'exclusion d'un enfant d'un
+    milieu de garde ou d'un milieu scolaire » (INSPQ, 25-207-01WFA) et
+    affiche tout de suite une recommandation temporaire. Ensuite, le
+    milieu envoie un signalement à la brigade de santé publique.
+
+  Comment le fichier est organisé (dans l'ordre) :
+    1. <head>   : réglages de la page et le CSS (l'apparence)
+    2. <body>   : le HTML (ce qu'on voit : titres, questions, boutons)
+    3. <script> : le JavaScript (la logique : lire les réponses,
+                  appliquer la fiche, afficher la recommandation, envoyer)
+
+  Les 3 langages en une phrase :
+    - HTML = le contenu (les questions, les boutons)
+    - CSS  = l'apparence (couleurs, tailles, disposition)
+    - JavaScript = le « cerveau » (les calculs et les décisions)
+
+  Pour apprendre les bases (gratuit, en français) :
+    https://developer.mozilla.org/fr/docs/Learn_web_development
+
+  Règle d'or pour modifier : changer UNE chose à la fois, puis tester
+  la page (bouton « Remplir un exemple » + quelques cas à la main).
+  Toute modification des critères, des seuils de fièvre ou des doses
+  doit être approuvée par l'équipe médicale avant d'être publiée.
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<!-- Cette ligne permet à la page de s'adapter aux téléphones. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exclusion milieu de garde</title>
+
+<style>
+/* =====================================================================
+   PARTIE 1 : L'APPARENCE (CSS)
+   =====================================================================
+   Comment lire une règle CSS :
+     .nom-de-classe {
+       propriété: valeur;
+     }
+   La règle s'applique à tous les éléments HTML qui ont class="nom-de-classe".
+*/
+
+/* ---------------------------------------------------------------------
+   1.1 Les couleurs
+   ---------------------------------------------------------------------
+   Toutes les couleurs sont définies UNE seule fois ici, avec un nom.
+   Ensuite, on les utilise partout avec var(--nom).
+   Pour changer une couleur partout sur la page, on la change seulement ici.
+   Les couleurs viennent de la fiche « Critères d'exclusion » (PDF).
+   Un code comme #EC6608 est une couleur en « hexadécimal ».
+   Pour en savoir plus sur les variables CSS :
+     https://developer.mozilla.org/fr-FR/docs/Web/CSS/Using_CSS_custom_properties
+*/
+:root {
+  --blanc: #FFFFFF;
+  --gris-tres-pale: #F4F4F4;   /* fond du résumé à copier */
+  --gris-pale: #E3E3E3;        /* boîtes grises (comme la définition de la fièvre sur la fiche) */
+  --gris-bordure: #878787;     /* bordures des boîtes */
+  --texte: #1A1A1A;            /* texte principal (presque noir) */
+  --texte-pale: #575757;       /* petits textes d'aide */
+
+  --orange: #EC6608;           /* barre de titre, comme sur la fiche */
+  --orange-fonce: #B84A00;     /* boutons et liens (plus foncé pour être lisible) */
+  --saumon: #FDE4D0;           /* boîte des conditions de retour, comme sur la fiche */
+  --orange-oui: #F39550;       /* boîtes « Oui » et « Exclure » de la fiche */
+  --rouge: #AE1613;            /* bordures rouges de la fiche, erreurs, MADO */
+
+  --vert-non: #B0D199;         /* boîtes « Non » de la fiche, « Pas d'exclusion » */
+  --vert-bordure: #3FA535;
+
+  --jaune-pale: #FFF4CF;       /* boîte d'avertissement de la fiche */
+  --jaune: #FFD500;
+}
+
+/* ---------------------------------------------------------------------
+   1.2 Réglages de base (toute la page)
+   --------------------------------------------------------------------- */
+
+/* La largeur d'une boîte inclut sa bordure et son espace intérieur.
+   Ça rend les tailles beaucoup plus simples à prévoir. */
+* {
+  box-sizing: border-box;
+}
+
+/* L'attribut HTML « hidden » cache un élément.
+   Le JavaScript l'enlève ou le remet pour montrer ou cacher une partie.
+   « !important » s'assure que rien d'autre ne le réaffiche par erreur. */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background: var(--blanc);
+  color: var(--texte);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+h1, h2, h3 {
+  margin: 0;
+  line-height: 1.15;
+}
+
+/* Les boutons et champs de formulaire utilisent la même police que la page. */
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Contour visible quand on navigue au clavier (touche Tab). Important pour l'accessibilité. */
+:focus-visible {
+  outline: 3px solid var(--orange-fonce);
+  outline-offset: 2px;
+}
+
+/* .conteneur = limite la largeur du contenu et le centre dans la page.
+   16px d'espace à gauche et à droite pour que le texte ne colle pas aux bords. */
+.conteneur {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* ---------------------------------------------------------------------
+   1.3 Haut de la page : barre de titre orange + texte d'introduction
+   --------------------------------------------------------------------- */
+.barre-titre {
+  background: var(--orange);
+  color: var(--blanc);
+}
+.barre-titre .conteneur {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+.barre-titre h1 {
+  /* clamp(min, idéal, max) : la taille du titre s'adapte à la largeur de l'écran */
+  font-size: clamp(22px, 3.4vw, 30px);
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+.introduction {
+  border-bottom: 1px solid var(--gris-pale);
+}
+.introduction .conteneur {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.sur-titre {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;   /* affiche le texte en MAJUSCULES */
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+.introduction p {
+  margin: 0;
+  max-width: 68ch;             /* environ 68 caractères par ligne : plus facile à lire */
+}
+
+/* ---------------------------------------------------------------------
+   1.4 Mise en page : formulaire à gauche, recommandation à droite
+   ---------------------------------------------------------------------
+   On utilise une « grille » CSS à 2 colonnes.
+   Pour en savoir plus sur les grilles et flexbox :
+     https://developer.mozilla.org/fr/docs/Learn_web_development/Core/CSS_layout
+*/
+main .conteneur {
+  padding-top: 24px;
+  padding-bottom: 96px;        /* espace en bas pour la barre du téléphone */
+}
+.mise-en-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 370px;   /* colonne 1 = le reste, colonne 2 = 370px */
+  gap: 28px;
+  align-items: start;
+}
+
+/* @media = règles qui s'appliquent seulement sur les petits écrans.
+   Sous 900px de large (tablette, téléphone), on passe à UNE seule colonne. */
+@media (max-width: 900px) {
+  .mise-en-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   1.5 Boîtes d'avertissement en haut
+   --------------------------------------------------------------------- */
+
+/* Boîte jaune « Urgence » (même style que l'avertissement de la fiche) */
+.alerte-urgence {
+  background: var(--jaune-pale);
+  border: 1px solid var(--jaune);
+  border-left: 6px solid var(--jaune);
+  padding: 12px 14px;
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+
+/* Boîte grise qui explique comment l'envoi fonctionne */
+.avis-envoi {
+  background: var(--gris-pale);
+  padding: 12px 14px;
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+
+/* ---------------------------------------------------------------------
+   1.6 Le formulaire et ses sections numérotées
+   --------------------------------------------------------------------- */
+form {
+  display: flex;               /* flex = les éléments se placent les uns sous les autres... */
+  flex-direction: column;      /* ...en colonne */
+  gap: 18px;                   /* 18px d'espace entre chaque section */
+}
+
+/* Chaque section numérotée (1. Le milieu, 2. L'enfant...) est un <fieldset>. */
+fieldset {
+  border: 1px solid var(--gris-bordure);
+  background: var(--blanc);
+  margin: 0;
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* <legend> contient le titre de la section. « display: contents » le place
+   simplement en haut de la section, comme un élément normal. */
+legend {
+  display: contents;
+}
+
+.titre-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* Le petit carré orange avec le numéro de la section */
+.numero-section {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  background: var(--orange);
+  color: var(--blanc);
+  font-weight: bold;
+  font-size: 15px;
+}
+.titre-section h2 {
+  font-size: 18px;
+  font-weight: bold;
+}
+/* Petit texte gris sous le titre d'une section */
+.sous-titre-section {
+  margin: -8px 0 0;
+  color: var(--texte-pale);
+  font-size: 14px;
+}
+
+/* .rangee = plusieurs champs côte à côte. Ils passent automatiquement
+   à la ligne si l'écran est trop étroit (minimum 200px chacun). */
+.rangee {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+/* .champ = une étiquette + sa zone de réponse */
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.champ > label,
+.question-titre {
+  font-weight: bold;
+  font-size: 15px;
+}
+/* Petit texte d'aide sous un champ */
+.aide {
+  font-size: 13px;
+  color: var(--texte-pale);
+}
+.petit-texte {
+  font-size: 13px;
+  color: var(--texte-pale);
+  margin: 0;
+}
+
+/* Les zones où on écrit (texte, nombre, date) et les listes déroulantes */
+input[type=text],
+input[type=tel],
+input[type=number],
+input[type=date],
+select,
+textarea {
+  background: var(--blanc);
+  border: 1px solid var(--gris-bordure);
+  padding: 10px 12px;
+  width: 100%;
+  min-width: 0;
+}
+textarea {
+  min-height: 84px;
+  resize: vertical;            /* on peut l'agrandir vers le bas seulement */
+}
+
+/* Âge : la zone du nombre + la liste « mois / ans » sur la même ligne */
+.age-ligne {
+  display: flex;
+  gap: 8px;
+}
+.age-ligne input {
+  flex: 1;                     /* la zone du nombre prend toute la place qui reste */
+  min-width: 0;
+}
+.age-ligne select {
+  width: auto;
+}
+
+/* ---------------------------------------------------------------------
+   1.7 Les boutons de choix (Oui / Non, CPE / Garderie, etc.)
+   ---------------------------------------------------------------------
+   Astuce : chaque choix est un vrai bouton radio (<input type="radio">),
+   mais on le rend invisible et on affiche à la place le <span> qui le suit,
+   stylé comme un bouton. Quand le radio est coché, le <span> change de couleur.
+   Le signe « + » en CSS veut dire « l'élément juste après ».
+   Pour en savoir plus sur les boutons radio :
+     https://developer.mozilla.org/fr/docs/Web/HTML/Element/input/radio
+*/
+.choix {
+  display: flex;
+  flex-wrap: wrap;             /* les boutons passent à la ligne s'il manque de place */
+  gap: 8px;
+}
+.choix label {
+  position: relative;
+}
+.choix input {
+  position: absolute;          /* le vrai bouton radio est placé par-dessus... */
+  inset: 0;
+  opacity: 0;                  /* ...et rendu invisible */
+  margin: 0;
+  cursor: pointer;
+}
+.choix span {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px solid var(--gris-bordure);
+  background: var(--blanc);
+  color: var(--texte);
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
+}
+/* Choix sélectionné (général) : fond saumon avec bordure orange */
+.choix input:checked + span {
+  background: var(--saumon);
+  border-color: var(--orange);
+  box-shadow: inset 0 0 0 1px var(--orange);   /* rend la bordure plus épaisse */
+}
+/* Contour visible au clavier */
+.choix input:focus-visible + span {
+  outline: 3px solid var(--orange-fonce);
+  outline-offset: 2px;
+}
+/* Choix désactivé (ex. : « Bouche » pour un enfant de moins de 5 ans) : grisé et barré */
+.choix input:disabled + span {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+/* Section 4 (critères) : mêmes couleurs que sur la fiche.
+   « Oui » coché = boîte orange avec bordure rouge.
+   « Non » = forme arrondie; coché = vert. */
+.critere .choix input[value="oui"]:checked + span {
+  background: var(--orange-oui);
+  border-color: var(--rouge);
+  box-shadow: inset 0 0 0 1px var(--rouge);
+}
+.critere .choix input[value="non"] + span {
+  border-radius: 999px;
+}
+.critere .choix input[value="non"]:checked + span {
+  background: var(--vert-non);
+  border-color: var(--vert-bordure);
+  box-shadow: inset 0 0 0 1px var(--vert-bordure);
+}
+
+/* Une ligne de critère : la question à gauche, Oui/Non à droite */
+.critere {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 18px;
+  align-items: center;
+  padding-top: 14px;
+  border-top: 1px solid var(--gris-pale);
+}
+/* Pas de ligne au-dessus du tout premier critère */
+.critere:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+.critere .question-titre {
+  font-weight: normal;
+}
+.critere small {
+  display: block;
+  color: var(--texte-pale);
+  font-size: 13px;
+  margin-top: 2px;
+}
+/* Sur un téléphone, Oui/Non passent sous la question */
+@media (max-width: 520px) {
+  .critere {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   1.8 Section Fièvre : message du seuil, encadré « 1 heure après »,
+       protocole d'acétaminophène, définition de la fièvre
+   --------------------------------------------------------------------- */
+
+/* Petit message « Fièvre / Pas de fièvre selon la définition » */
+.message-fievre {
+  font-size: 13px;
+  font-weight: bold;
+  padding: 3px 8px;
+  align-self: flex-start;
+}
+.message-fievre.fievre {
+  background: var(--saumon);
+  color: var(--rouge);
+  border: 1px solid var(--rouge);
+}
+.message-fievre.pas-de-fievre {
+  background: var(--vert-non);
+  border: 1px solid var(--vert-bordure);
+}
+.message-fievre.attention {
+  background: var(--jaune-pale);
+  border: 1px solid var(--jaune);
+}
+
+/* Encadré saumon « 3 mois et plus avec fièvre au milieu de garde » */
+.encadre-reprise {
+  border-left: 4px solid var(--orange);
+  background: var(--saumon);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.encadre-reprise > p {
+  margin: 0;
+}
+
+/* Boîte blanche du protocole d'acétaminophène */
+.boite-acetaminophene {
+  background: var(--blanc);
+  border: 1px solid var(--gris-bordure);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.question-acetaminophene {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lien-protocole {
+  color: var(--orange-fonce);
+  font-weight: bold;
+}
+/* Résultat du protocole (vert = dose, saumon = ne pas donner) */
+.resultat-acetaminophene {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.resultat-acetaminophene p,
+.resultat-acetaminophene ul {
+  margin: 0;
+}
+.resultat-acetaminophene ul {
+  padding-left: 20px;
+  font-size: 14px;
+}
+.resultat-acetaminophene.dose-ok {
+  background: var(--vert-non);
+  border: 1px solid var(--vert-bordure);
+}
+.resultat-acetaminophene.ne-pas-donner {
+  background: var(--saumon);
+  border: 1px solid var(--rouge);
+}
+.dose {
+  font-size: 30px;
+  font-weight: bold;
+  line-height: 1.1;
+}
+
+/* « Définition de la fièvre » : une boîte grise qu'on peut ouvrir et fermer (<details>) */
+details.definition {
+  font-size: 14px;
+  background: var(--gris-pale);
+  padding: 10px 14px;
+}
+details.definition summary {
+  cursor: pointer;
+  font-weight: bold;
+}
+.tableau-definition {
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+.tableau-definition td {
+  padding: 4px 12px 4px 0;
+  border-bottom: 1px solid var(--gris-bordure);
+}
+
+/* ---------------------------------------------------------------------
+   1.9 Boutons du bas du formulaire
+   --------------------------------------------------------------------- */
+.boutons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.bouton {
+  border: 1px solid var(--gris-bordure);
+  background: var(--blanc);
+  padding: 11px 18px;
+  font-weight: bold;
+  cursor: pointer;
+}
+/* Bouton principal (« Envoyer à la brigade ») */
+.bouton.principal {
+  background: var(--orange-fonce);
+  border-color: var(--orange-fonce);
+  color: var(--blanc);
+}
+.bouton:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+/* Bouton qui ressemble à un lien (« Recommencer », « Remplir un exemple ») */
+.bouton-lien {
+  border: 0;
+  background: none;
+  color: var(--orange-fonce);
+  font-weight: bold;
+  cursor: pointer;
+  padding: 4px;
+  text-decoration: underline;
+}
+
+/* Champs à compléter : en rouge quand on clique « Envoyer » et qu'il manque une réponse */
+.erreur {
+  color: var(--rouge);
+  font-size: 13px;
+}
+.champ.invalide input,
+.champ.invalide select {
+  border-color: var(--rouge);
+}
+.critere.invalide .question-titre {
+  color: var(--rouge);
+}
+
+/* ---------------------------------------------------------------------
+   1.10 Colonne de droite : la recommandation
+   --------------------------------------------------------------------- */
+.colonne-recommandation {
+  position: sticky;            /* reste visible quand on fait défiler la page */
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .colonne-recommandation {
+    position: static;          /* sur téléphone, elle se place simplement sous le formulaire */
+  }
+}
+
+/* La grande boîte de couleur avec la recommandation.
+   Elle a 2 classes : « statut » + une classe qui donne la couleur :
+     exclure (orange), attendre (jaune), pas-exclure (vert), incomplet (gris) */
+.statut {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid transparent;
+}
+.statut .etiquette {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.statut h3 {
+  font-size: 22px;
+}
+.statut p {
+  margin: 0;
+}
+.statut.exclure {
+  background: var(--orange-oui);
+  border-color: var(--rouge);
+}
+.statut.attendre {
+  background: var(--jaune-pale);
+  border-color: var(--jaune);
+}
+.statut.pas-exclure {
+  background: var(--vert-non);
+  border-color: var(--vert-bordure);
+}
+.statut.incomplet {
+  background: var(--gris-pale);
+  border-color: var(--gris-pale);
+}
+
+/* Les boîtes blanches sous la recommandation (Pourquoi, À noter, Ensuite...) */
+.boite {
+  background: var(--blanc);
+  border: 1px solid var(--gris-bordure);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.boite h4 {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.boite p {
+  margin: 0;
+}
+.boite ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 15px;
+}
+/* Boîte saumon des conditions de retour (comme sur la fiche) */
+.boite.saumon {
+  background: var(--saumon);
+  border-color: var(--rouge);
+}
+/* Condition de retour qui s'applique à cet enfant : en gras */
+li.applicable {
+  font-weight: bold;
+}
+.mention-applicable {
+  font-weight: normal;
+  font-style: italic;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+/* Boîte rouge « Priorité MADO » */
+.boite-mado {
+  background: var(--blanc);
+  border: 2px solid var(--rouge);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.boite-mado .etiquette {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rouge);
+}
+.boite-mado h3 {
+  font-size: 20px;
+  color: var(--rouge);
+}
+.boite-mado p {
+  margin: 0;
+}
+
+/* « Il manque encore : ... » */
+.manquant {
+  font-size: 14px;
+  color: var(--texte-pale);
+}
+
+/* Boîte qui apparaît après avoir cliqué « Envoyer » */
+.boite-envoi {
+  background: var(--blanc);
+  border: 2px solid var(--orange);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.boite-envoi h3 {
+  font-size: 20px;
+}
+.boite-envoi p {
+  margin: 0;
+}
+/* Le résumé texte à copier */
+pre.resume {
+  white-space: pre-wrap;       /* garde les retours à la ligne et coupe les lignes trop longues */
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12.5px;
+  background: var(--gris-tres-pale);
+  padding: 12px;
+  margin: 0;
+  max-height: 300px;
+  overflow: auto;
+}
+
+/* ---------------------------------------------------------------------
+   1.11 Barre du bas sur téléphone (montre la recommandation en bref)
+   --------------------------------------------------------------------- */
+.barre-telephone {
+  display: none;               /* cachée sur ordinateur */
+}
+@media (max-width: 900px) {
+  .barre-telephone {
+    display: flex;
+    position: fixed;           /* collée en bas de l'écran */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;                /* passe par-dessus le reste de la page */
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--blanc);
+    border-top: 1px solid var(--gris-bordure);
+    padding: 10px 16px;
+  }
+}
+/* Petite étiquette de couleur dans la barre du téléphone */
+.pastille {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: bold;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.pastille.exclure { background: var(--orange-oui); }
+.pastille.attendre { background: var(--jaune-pale); }
+.pastille.pas-exclure { background: var(--vert-non); }
+.pastille.incomplet { background: var(--gris-pale); }
+</style>
+</head>
+
+<body>
+<!-- =====================================================================
+     PARTIE 2 : LE CONTENU (HTML)
+     =====================================================================
+     Rappel :
+       - class="..." sert au CSS (l'apparence)
+       - id="..." est un nom unique; le JavaScript s'en sert pour trouver l'élément
+       - name="..." sur une question = le nom de la réponse que le JavaScript lit
+       - value="..." = la valeur enregistrée quand ce choix est coché
+     IMPORTANT : on peut changer librement le texte des questions, mais il ne
+     faut pas changer les « name » et les « value » sans changer aussi le JavaScript.
+-->
+
+<!-- Barre de titre orange -->
+<div class="barre-titre">
+  <div class="conteneur">
+    <h1>Exclusion d'un enfant malade</h1>
+  </div>
+</div>
+
+<!-- Texte d'introduction -->
+<header class="introduction">
+  <div class="conteneur">
+    <div class="sur-titre">Milieux de garde et scolaires · Brigade de santé publique</div>
+    <p>Répondez aux questions. Vous obtenez tout de suite une recommandation temporaire basée sur les critères d'exclusion, et votre signalement est transmis à la brigade.</p>
+  </div>
+</header>
+
+<main>
+<div class="conteneur">
+
+  <!-- Boîte d'urgence -->
+  <div class="alerte-urgence" role="note">
+    <b>Urgence :</b> difficulté à respirer, enfant très somnolent ou difficile à réveiller, convulsion : composez le <b>911</b>.
+    Pour un conseil santé : Info-Santé <b>811</b>.
+    Cet outil ne remplace pas une consultation avec un professionnel de la santé ni les consignes liées à un diagnostic.
+  </div>
+
+  <!-- Boîte grise qui explique l'envoi. Son texte est écrit par le JavaScript au démarrage (voir « DÉMARRAGE » tout en bas). -->
+  <div class="avis-envoi" id="avis-envoi" hidden></div>
+
+  <div class="mise-en-page">
+
+  <!-- =================== LE FORMULAIRE (colonne de gauche) ===================
+       novalidate = on fait nous-mêmes la vérification des réponses (en JavaScript) -->
+  <form id="formulaire" novalidate>
+
+    <!-- ---------- Section 1 : le milieu ---------- -->
+    <fieldset>
+      <legend>
+        <div class="titre-section"><span class="numero-section">1</span><h2>Le milieu</h2></div>
+      </legend>
+
+      <div class="champ">
+        <span class="question-titre">Type de milieu</span>
+        <div class="choix">
+          <label><input type="radio" name="type" value="CPE"><span>CPE</span></label>
+          <label><input type="radio" name="type" value="Garderie"><span>Garderie</span></label>
+          <label><input type="radio" name="type" value="Milieu familial"><span>Milieu familial</span></label>
+          <label><input type="radio" name="type" value="École"><span>École</span></label>
+        </div>
+      </div>
+
+      <div class="rangee">
+        <div class="champ">
+          <label for="champ-nom">Nom du milieu</label>
+          <input type="text" id="champ-nom" name="nom" autocomplete="organization">
+        </div>
+        <div class="champ">
+          <label for="champ-contact">Personne à joindre</label>
+          <input type="text" id="champ-contact" name="contact" autocomplete="name">
+        </div>
+        <div class="champ">
+          <label for="champ-tel">Téléphone</label>
+          <input type="tel" id="champ-tel" name="tel" autocomplete="tel">
+        </div>
+      </div>
+
+      <!-- Brigade : le JavaScript met ici soit une zone de texte, soit une liste déroulante,
+           selon la liste BRIGADES et le lien utilisé (voir « BRIGADES » dans le JavaScript). -->
+      <div class="champ">
+        <label for="champ-brigade">Brigade ou territoire</label>
+        <div id="emplacement-brigade"></div>
+        <span class="aide" id="aide-brigade"></span>
+      </div>
+
+      <p class="petit-texte">Ces coordonnées sont gardées sur cet appareil pour vos prochains signalements.</p>
+    </fieldset>
+
+    <!-- ---------- Section 2 : l'enfant ---------- -->
+    <fieldset>
+      <legend>
+        <div class="titre-section"><span class="numero-section">2</span><h2>L'enfant</h2></div>
+      </legend>
+
+      <div class="rangee">
+        <div class="champ">
+          <label for="champ-age">Âge</label>
+          <div class="age-ligne">
+            <input type="number" id="champ-age" name="age" min="0" max="18" step="1" inputmode="numeric">
+            <select id="champ-unite-age" name="uniteAge" aria-label="Unité d'âge">
+              <option value="mois">mois</option>
+              <option value="ans" selected>ans</option>
+            </select>
+          </div>
+        </div>
+        <div class="champ">
+          <label for="champ-debut">Début des symptômes</label>
+          <input type="date" id="champ-debut" name="debut">
+        </div>
+      </div>
+
+      <p class="petit-texte">Aucun nom ni identifiant de l'enfant n'est demandé.</p>
+
+      <div class="champ">
+        <label for="champ-autres">Autres enfants ou membres du personnel avec des symptômes semblables</label>
+        <input type="number" id="champ-autres" name="autres" min="0" step="1" inputmode="numeric" placeholder="0" style="max-width: 140px">
+      </div>
+    </fieldset>
+
+    <!-- ---------- Section 3 : la fièvre ---------- -->
+    <fieldset>
+      <legend>
+        <div class="titre-section"><span class="numero-section">3</span><h2>Fièvre</h2></div>
+      </legend>
+      <p class="sous-titre-section">La fièvre est un critère parmi d'autres. Si l'enfant n'a pas de fièvre, les autres critères s'appliquent quand même.</p>
+
+      <div class="champ">
+        <span class="question-titre">La température a-t-elle été prise?</span>
+        <div class="choix">
+          <label><input type="radio" name="mesure" value="oui"><span>Oui</span></label>
+          <label><input type="radio" name="mesure" value="non"><span>Non</span></label>
+        </div>
+      </div>
+
+      <!-- Cachée au départ; s'affiche quand « Oui, la température a été prise » est coché. -->
+      <div class="rangee" id="zone-temperature" hidden>
+        <div class="champ">
+          <label for="champ-temp">Température (°C)</label>
+          <input type="number" id="champ-temp" name="temp" min="34" max="43" step="0.1" inputmode="decimal" placeholder="38,2">
+        </div>
+        <div class="champ">
+          <span class="question-titre">Prise par</span>
+          <div class="choix">
+            <label><input type="radio" name="voie" value="rectum"><span>Rectum</span></label>
+            <label><input type="radio" name="voie" value="bouche" id="voie-bouche"><span>Bouche</span></label>
+            <label><input type="radio" name="voie" value="aisselle" id="voie-aisselle"><span>Aisselle</span></label>
+          </div>
+          <span class="aide" id="aide-voie">La température par le rectum est la plus fiable.</span>
+        </div>
+      </div>
+
+      <!-- Message « Fièvre / Pas de fièvre selon la définition ». Écrit par le JavaScript. -->
+      <span class="message-fievre" id="message-fievre" hidden></span>
+
+      <!-- Cachée au départ; s'affiche seulement s'il y a de la fièvre selon la définition. -->
+      <div class="champ" id="zone-lieu-fievre" hidden>
+        <span class="question-titre">Où la fièvre a-t-elle été remarquée?</span>
+        <div class="choix">
+          <label><input type="radio" name="lieu" value="maison"><span>Le matin, à la maison</span></label>
+          <label><input type="radio" name="lieu" value="garde"><span>Pendant la journée, au milieu de garde</span></label>
+          <label><input type="radio" name="lieu" value="ecole"><span>Pendant la journée, à l'école</span></label>
+        </div>
+      </div>
+
+      <!-- Encadré « 1 heure après ». S'affiche seulement pour un enfant de 3 mois et plus
+           avec de la fièvre remarquée AU MILIEU DE GARDE (c'est la branche de la fiche
+           « acétaminophène si indiqué, puis reprendre la température 1 heure après »). -->
+      <div class="encadre-reprise" id="encadre-reprise" hidden>
+        <p><b>Enfant de 3 mois et plus avec fièvre au milieu de garde :</b> prévenez le parent, habillez l'enfant légèrement et faites-le boire plus souvent. Si le protocole le permet, donnez de l'acétaminophène, puis reprenez la température 1 heure après, par la même voie.</p>
+
+        <!-- Protocole d'acétaminophène du ministère de la Famille (FO-0647, 01-2025) -->
+        <div class="boite-acetaminophene">
+          <div>
+            <b>Protocole d'acétaminophène</b> <span class="aide">(ministère de la Famille, FO-0647)</span><br>
+            <a class="lien-protocole" href="https://cdn-contenu.quebec.ca/cdn-contenu/adm/min/famille/publications-adm/Service_de_garde/sante-securite/SGEE_protocole_acetaminophene.pdf" target="_blank" rel="noopener">Lire le protocole complet (PDF, 6 pages)</a>
+            <span class="aide">: à lire au moins une fois avant de l'appliquer.</span>
+          </div>
+
+          <div class="question-acetaminophene">
+            <span>Le parent a-t-il signé le formulaire d'autorisation du protocole?</span>
+            <div class="choix">
+              <label><input type="radio" name="ac_formulaire" value="oui"><span>Oui</span></label>
+              <label><input type="radio" name="ac_formulaire" value="non"><span>Non</span></label>
+            </div>
+          </div>
+          <div class="question-acetaminophene">
+            <span>L'enfant a-t-il une allergie connue à l'acétaminophène?</span>
+            <div class="choix">
+              <label><input type="radio" name="ac_allergie" value="oui"><span>Oui</span></label>
+              <label><input type="radio" name="ac_allergie" value="non"><span>Non</span></label>
+            </div>
+          </div>
+          <div class="question-acetaminophene">
+            <span>A-t-il reçu de l'acétaminophène, ou un médicament qui en contient (ex. : sirop contre la toux), dans les 4 dernières heures?</span>
+            <div class="choix">
+              <label><input type="radio" name="ac_4h" value="oui"><span>Oui</span></label>
+              <label><input type="radio" name="ac_4h" value="non"><span>Non</span></label>
+              <label><input type="radio" name="ac_4h" value="inconnu"><span>Je ne sais pas</span></label>
+            </div>
+          </div>
+          <div class="question-acetaminophene">
+            <span>Reçoit-il de l'acétaminophène pour cette fièvre depuis plus de 48 heures?</span>
+            <div class="choix">
+              <label><input type="radio" name="ac_48h" value="oui"><span>Oui</span></label>
+              <label><input type="radio" name="ac_48h" value="non"><span>Non</span></label>
+            </div>
+          </div>
+
+          <div class="rangee">
+            <div class="champ">
+              <label for="champ-poids">Poids inscrit au formulaire (kg)</label>
+              <input type="number" id="champ-poids" name="ac_poids" min="2" max="80" step="0.1" inputmode="decimal">
+              <span class="aide">Le poids doit avoir été revalidé avec le parent il y a 3 mois ou moins.</span>
+            </div>
+            <div class="champ">
+              <label for="champ-concentration">Concentration du produit</label>
+              <!-- Les « value » 80/1, 80/5, 160/5 sont utilisées dans le tableau des doses (JavaScript). -->
+              <select id="champ-concentration" name="ac_concentration">
+                <option value="">Choisir…</option>
+                <option value="80/1">80 mg / 1 ml (gouttes)</option>
+                <option value="80/5">80 mg / 5 ml</option>
+                <option value="160/5">160 mg / 5 ml</option>
+              </select>
+              <span class="aide">Lisez-la sur le contenant.</span>
+            </div>
+          </div>
+
+          <!-- Le résultat (dose ou « ne pas donner ») est écrit ici par le JavaScript. -->
+          <div id="resultat-acetaminophene" aria-live="polite"></div>
+        </div>
+
+        <div class="champ">
+          <span class="question-titre">Acétaminophène donné?</span>
+          <div class="choix">
+            <label><input type="radio" name="aceta" value="oui"><span>Oui, selon le protocole</span></label>
+            <label><input type="radio" name="aceta" value="non"><span>Non (protocole ne s'applique pas ou non indiqué)</span></label>
+          </div>
+        </div>
+        <div class="champ">
+          <label for="champ-temp2">Température 1 heure après (°C)</label>
+          <input type="number" id="champ-temp2" name="temp2" min="34" max="43" step="0.1" inputmode="decimal" style="max-width: 160px">
+          <span class="aide">Laissez vide si l'heure n'est pas encore passée.</span>
+        </div>
+      </div>
+
+      <!-- <details> = boîte qu'on ouvre en cliquant sur son titre (<summary>). -->
+      <details class="definition">
+        <summary>Définition de la fièvre</summary>
+        <table class="tableau-definition">
+          <tr><td>Moins de 3 mois</td><td>Rectum</td><td>≥ 38,0 °C</td></tr>
+          <tr><td rowspan="3">3 mois et plus</td><td>Rectum</td><td>≥ 38,5 °C</td></tr>
+          <tr><td>Bouche (5 ans et plus seulement)</td><td>≥ 38,0 °C</td></tr>
+          <tr><td>Aisselle</td><td>≥ 37,5 °C</td></tr>
+        </table>
+      </details>
+    </fieldset>
+
+    <!-- ---------- Section 4 : les autres critères de la fiche ----------
+         Chaque critère a la classe « critere » et un attribut data-critere avec
+         le même mot que son « name ». Ça permet au JavaScript de le colorer
+         en rouge s'il n'a pas de réponse. -->
+    <fieldset>
+      <legend>
+        <div class="titre-section"><span class="numero-section">4</span><h2>Autres critères</h2></div>
+      </legend>
+      <p class="sous-titre-section">Ces critères s'appliquent avec ou sans fièvre. Une seule réponse « oui » suffit pour exclure, mais répondez à toutes les questions.</p>
+
+      <div class="critere" data-critere="etat">
+        <div class="question-titre">Son état de santé l'empêche-t-il de suivre les activités du groupe, ou empêche-t-il la personne responsable de s'occuper adéquatement des autres enfants?</div>
+        <div class="choix">
+          <label><input type="radio" name="etat" value="oui"><span>Oui</span></label>
+          <label><input type="radio" name="etat" value="non"><span>Non</span></label>
+        </div>
+      </div>
+
+      <div class="critere" data-critere="vomissements">
+        <div class="question-titre">A-t-il eu 2 vomissements ou plus dans les dernières 24 heures?</div>
+        <div class="choix">
+          <label><input type="radio" name="vomissements" value="oui"><span>Oui</span></label>
+          <label><input type="radio" name="vomissements" value="non"><span>Non</span></label>
+        </div>
+      </div>
+
+      <div class="critere" data-critere="diarrhee">
+        <div class="question-titre">A-t-il de la diarrhée trop abondante pour être contenue dans la couche, OU avec du sang ou du mucus, OU est-il incontinent?<small>Incontinent : incapable de se rendre à la salle de bain.</small></div>
+        <div class="choix">
+          <label><input type="radio" name="diarrhee" value="oui"><span>Oui</span></label>
+          <label><input type="radio" name="diarrhee" value="non"><span>Non</span></label>
+        </div>
+      </div>
+
+      <div class="critere" data-critere="lesions">
+        <div class="question-titre">A-t-il des lésions de la peau avec écoulement de pus qui ne peuvent pas être couvertes par un pansement imperméable?</div>
+        <div class="choix">
+          <label><input type="radio" name="lesions" value="oui"><span>Oui</span></label>
+          <label><input type="radio" name="lesions" value="non"><span>Non</span></label>
+        </div>
+      </div>
+
+      <div class="critere" data-critere="consigne">
+        <div class="question-titre">Un professionnel de la santé a-t-il demandé d'exclure l'enfant temporairement?</div>
+        <div class="choix">
+          <label><input type="radio" name="consigne" value="oui"><span>Oui</span></label>
+          <label><input type="radio" name="consigne" value="non"><span>Non</span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ---------- Section 5 : diagnostic ---------- -->
+    <fieldset>
+      <legend>
+        <div class="titre-section"><span class="numero-section">5</span><h2>Diagnostic</h2></div>
+      </legend>
+      <p class="sous-titre-section">Le diagnostic ne change pas la recommandation temporaire. Il permet à la brigade de prioriser le signalement et de vérifier s'il existe des consignes propres à la maladie.</p>
+
+      <div class="champ">
+        <span class="question-titre">Un professionnel de la santé a-t-il posé un diagnostic?</span>
+        <div class="choix">
+          <label><input type="radio" name="diagnostic" value="oui"><span>Oui</span></label>
+          <label><input type="radio" name="diagnostic" value="non"><span>Non</span></label>
+          <label><input type="radio" name="diagnostic" value="attente"><span>Consultation à venir</span></label>
+        </div>
+      </div>
+
+      <!-- Cachée au départ; s'affiche si « Oui » est coché. -->
+      <div class="rangee" id="zone-maladie" hidden>
+        <div class="champ">
+          <label for="champ-maladie">Diagnostic</label>
+          <!-- La liste des maladies est ajoutée par le JavaScript (listes MADO et AUTRES_MALADIES). -->
+          <select id="champ-maladie" name="maladie">
+            <option value="">Choisir…</option>
+          </select>
+          <span class="aide">Les maladies à déclaration obligatoire (MADO) sont regroupées en haut de la liste.</span>
+        </div>
+        <!-- S'affiche seulement si « Autre (préciser) » est choisi. -->
+        <div class="champ" id="zone-maladie-autre" hidden>
+          <label for="champ-maladie-autre">Préciser le diagnostic</label>
+          <input type="text" id="champ-maladie-autre" name="maladieAutre">
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ---------- Section 6 : autres informations ---------- -->
+    <fieldset>
+      <legend>
+        <div class="titre-section"><span class="numero-section">6</span><h2>Autres informations</h2></div>
+      </legend>
+      <div class="champ">
+        <label for="champ-notes">Symptômes observés, diagnostic connu, questions pour la brigade</label>
+        <textarea id="champ-notes" name="notes" placeholder="Ex. : toux, éruption sur le tronc, diagnostic de gastro-entérite par le médecin…"></textarea>
+      </div>
+    </fieldset>
+
+    <!-- ---------- Boutons ---------- -->
+    <div class="boutons">
+      <!-- type="submit" = ce bouton « soumet » le formulaire (voir « ENVOYER » dans le JavaScript) -->
+      <button type="submit" class="bouton principal" id="bouton-envoyer">Envoyer à la brigade</button>
+      <button type="button" class="bouton" id="bouton-copier">Copier le résumé</button>
+      <button type="button" class="bouton-lien" id="bouton-recommencer">Recommencer</button>
+      <button type="button" class="bouton-lien" id="bouton-exemple">Remplir un exemple</button>
+    </div>
+    <!-- Message d'erreur (« Complétez : ... »), caché au départ -->
+    <p class="erreur" id="message-erreur" hidden></p>
+  </form>
+
+  <!-- =================== LA RECOMMANDATION (colonne de droite) ===================
+       Vide au départ : le JavaScript la remplit à chaque réponse.
+       aria-live="polite" = les lecteurs d'écran annoncent les changements. -->
+  <aside class="colonne-recommandation" id="recommandation" aria-live="polite"></aside>
+
+  </div>
+</div>
+</main>
+
+<!-- Barre du bas sur téléphone -->
+<div class="barre-telephone">
+  <span class="pastille incomplet" id="pastille-telephone">En cours de saisie</span>
+  <a href="#recommandation" class="bouton-lien">Voir la recommandation</a>
+</div>
+
+
+<script>
+/* =====================================================================
+   PARTIE 3 : LA LOGIQUE (JavaScript)
+   =====================================================================
+   Le JavaScript se lit de haut en bas. Il est divisé en sections :
+     3.1  Réglages (formulaire Microsoft, base de données, contact)
+     3.2  Liste des brigades
+     3.3  Les données de la fiche (motifs, conditions de retour, critères)
+     3.4  Les listes de maladies (MADO et autres)
+     3.5  Le tableau des doses d'acétaminophène
+     3.6  Petites fonctions utiles
+     3.7  La définition de la fièvre
+     3.8  LA DÉCISION (la fiche « Critères d'exclusion » en code)
+     3.9  Le protocole d'acétaminophène
+     3.10 Afficher / cacher les parties du formulaire
+     3.11 Écrire la recommandation à droite
+     3.12 Mettre la page à jour à chaque réponse
+     3.13 Mémoriser les coordonnées du milieu
+     3.14 Vérifier les réponses avant l'envoi
+     3.15 Préparer le signalement et le résumé texte
+     3.16 Copier le résumé
+     3.17 Microsoft Forms (formulaire prérempli)
+     3.18 Base de données Supabase
+     3.19 ENVOYER
+     3.20 Boutons « Recommencer » et « Remplir un exemple »
+     3.21 DÉMARRAGE
+
+   Pour voir les erreurs du JavaScript : ouvrir la page dans Chrome,
+   clic droit > « Inspecter » > onglet « Console ».
+*/
+
+
+/* ---------------------------------------------------------------------
+   3.1 RÉGLAGES
+   ---------------------------------------------------------------------
+   formsPrefillUrl : le lien prérempli de Microsoft Forms. On l'obtient dans
+                     Forms avec « … > Obtenir l'URL préremplie », en tapant
+                     MILIEU, TEL, RECO, RESUME et BRIGADE comme réponses.
+                     Si ce lien est rempli, « Envoyer » ouvre le formulaire
+                     Microsoft avec toutes les réponses déjà inscrites.
+   supabaseUrl,
+   supabaseKey     : l'adresse et la clé PUBLIQUE (« publishable » ou « anon »)
+                     du projet Supabase. Ne JAMAIS mettre la clé secrète ici :
+                     tout le monde peut lire ce fichier.
+                     Utilisés seulement si formsPrefillUrl est vide.
+   supabaseTable   : le nom de la table créée dans Supabase.
+   contactBrigade  : téléphone ou courriel de la brigade, affiché aux milieux.
+                     Laisser "" (vide) pour ne rien afficher.
+*/
+const CONFIG = {
+  formsPrefillUrl: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=KP7hBotfdUC_bK4kvhp5kh5olmmVHo1Bgz-VXjqPf9pUMUFSUlFUSzVaV0RCVEJQTTczNlpOTVgzOC4u&r8cc333a109d34b69822c4350d6b76f0d=MILIEU&r6ca19c78b3944e4898be540ed005cacf=TEL&r9d1b170ea2c248a7a1ed96bbfdfba118=RECO&r223adf8618814e6da6c80493fbcfb7b6=RESUME&rd1482d57db7d490e9019acd91d33ab6a=BRIGADE",
+  supabaseUrl: "https://ahcsofbwujovaufqlkel.supabase.co",
+  supabaseKey: "sb_publishable_F-Hwo69WjCWpi314gorjJw_Aw63o8q9",
+  supabaseTable: "signalements",
+  contactBrigade: ""
+};
+
+
+/* ---------------------------------------------------------------------
+   3.2 BRIGADES
+   ---------------------------------------------------------------------
+   Une ligne par brigade, entre accolades { }, séparées par des virgules.
+     code       : court identifiant. Il sert dans le lien de la brigade :
+                  adresse-du-site/?brigade=12  remplit automatiquement la brigade 12.
+     nom        : nom affiché.
+     territoire : facultatif (CLSC, quartier...).
+     form       : facultatif. Lien prérempli d'un formulaire Microsoft Forms
+                  PROPRE à cette brigade. S'il est vide, on utilise formsPrefillUrl.
+   Exemple (enlever les // au début pour l'activer) :
+     // { code: "12", nom: "Brigade Centre-Sud", territoire: "CLSC des Faubourgs", form: "" },
+   Si la liste est vide, le milieu tape sa brigade dans une zone de texte.
+*/
+const BRIGADES = [
+];
+
+
+/* ---------------------------------------------------------------------
+   3.3 LES DONNÉES DE LA FICHE « Critères d'exclusion » (25-207-01WFA)
+   ---------------------------------------------------------------------
+   Ce sont seulement des textes et des listes. Pour changer la formulation,
+   on change le texte entre guillemets " ". On ne change pas les mots de gauche
+   (ce sont des codes que le reste du code utilise).
+*/
+
+// Les 5 critères de la section 4. Ce sont les mêmes mots que les « name » dans le HTML.
+const CRITERES = ["etat", "vomissements", "diarrhee", "lesions", "consigne"];
+
+// MOTIFS : le texte affiché sous « Pourquoi » quand on exclut l'enfant.
+//   texte  = la phrase affichée
+//   retour = quelle condition de retour (liste suivante) s'applique à ce motif
+const MOTIFS = {
+  fievre_maison:     { texte: "Fièvre le matin à la maison", retour: "fievre" },
+  fievre_ecole:      { texte: "Fièvre apparue à l'école", retour: "fievre" },
+  fievre_bebe:       { texte: "Fièvre chez un enfant de moins de 3 mois", retour: "fievre" },
+  fievre_persistante:{ texte: "Fièvre toujours présente 1 heure après (acétaminophène si indiqué)", retour: "fievre" },
+  etat:              { texte: "État de santé qui l'empêche de suivre les activités ou qui empêche de s'occuper des autres enfants", retour: "etat" },
+  vomissements:      { texte: "2 vomissements ou plus dans les dernières 24 heures", retour: "vomissements" },
+  diarrhee:          { texte: "Diarrhée non contenue dans la couche, avec sang ou mucus, ou enfant incontinent", retour: "diarrhee" },
+  lesions:           { texte: "Lésions avec pus qui ne peuvent pas être couvertes par un pansement imperméable", retour: "lesions" },
+  consigne:          { texte: "Consigne d'exclusion d'un professionnel de la santé", retour: "consigne" }
+};
+
+// CONDITIONS DE RETOUR (en bas de la fiche). Elles s'affichent dans cet ordre.
+// Chaque ligne : { code, texte }. Le code fait le lien avec « retour » dans MOTIFS.
+const CONDITIONS_RETOUR = [
+  { code: "fievre",       texte: "Absence de fièvre." },
+  { code: "etat",         texte: "Son état général lui permet de participer aux activités du groupe et demande peu ou pas de soins supplémentaires." },
+  { code: "vomissements", texte: "Aucun vomissement depuis 24 heures." },
+  { code: "diarrhee",     texte: "Si diarrhée : selles retenues dans la couche ou enfant continent, sans sang ni mucus." },
+  { code: "lesions",      texte: "Si lésions avec pus : plus d'écoulement, ou lésions couvertes par un pansement imperméable." },
+  { code: "consigne",     texte: "Si l'exclusion vient d'un professionnel de la santé : retour selon sa consigne." }
+];
+
+// Texte lisible pour l'endroit où la fièvre a été remarquée (utilisé dans le résumé).
+const LIEUX_FIEVRE = {
+  maison: "Le matin, à la maison",
+  garde: "Au milieu de garde",
+  ecole: "À l'école"
+};
+
+// Les 4 résultats possibles de la décision, et leur texte court.
+//   exclure     = exclure l'enfant
+//   attendre    = reprendre la température dans 1 heure
+//   pas-exclure = pas besoin d'exclure
+//   incomplet   = il manque des réponses
+// Ces mêmes mots sont aussi des classes CSS (couleurs), voir section 1.10 du CSS.
+const TEXTE_COURT = {
+  "exclure": "Exclure",
+  "attendre": "Réévaluer dans 1 h",
+  "pas-exclure": "Pas d'exclusion",
+  "incomplet": "Incomplet"
+};
+
+
+/* ---------------------------------------------------------------------
+   3.4 LISTES DE MALADIES
+   ---------------------------------------------------------------------
+   MADO = maladies à déclaration obligatoire, pertinentes en milieu de garde.
+   Source : listes MADO du MSSS (médecins et laboratoires).
+   Si on choisit une maladie de la liste MADO, le signalement est marqué « prioritaire ».
+   Pour ajouter une maladie : l'écrire entre guillemets, suivie d'une virgule.
+*/
+const MADO = [
+  "Coqueluche",
+  "Cryptosporidiose",
+  "Diphtérie",
+  "Fièvre typhoïde ou paratyphoïde",
+  "Giardiase",
+  "Hépatite A",
+  "Infection à Campylobacter",
+  "Infection à E. coli producteur de shigatoxines (incluant SHU)",
+  "Infection à Yersinia",
+  "Infection invasive à Haemophilus influenzae",
+  "Infection invasive à méningocoque",
+  "Infection invasive à pneumocoque",
+  "Infection invasive à streptocoque du groupe A",
+  "Oreillons",
+  "Poliomyélite",
+  "Rougeole",
+  "Rubéole",
+  "Salmonellose",
+  "Shigellose",
+  "Tuberculose"
+];
+
+// Autres diagnostics fréquents (PAS des MADO).
+const AUTRES_MALADIES = [
+  "Bronchiolite",
+  "Cinquième maladie",
+  "Conjonctivite",
+  "COVID-19",
+  "Gale",
+  "Gastro-entérite",
+  "Impétigo",
+  "Influenza (grippe)",
+  "Otite",
+  "Pharyngite à streptocoque",
+  "Pieds-mains-bouche",
+  "Poux",
+  "Roséole",
+  "Varicelle"
+];
+
+
+/* ---------------------------------------------------------------------
+   3.5 TABLEAU DES DOSES D'ACÉTAMINOPHÈNE
+   ---------------------------------------------------------------------
+   Copié du « Protocole pour l'administration d'acétaminophène en cas de fièvre
+   dans les services de garde éducatifs à l'enfance » (ministère de la Famille,
+   FO-0647, 01-2025), page 4.
+   Une ligne = une tranche de poids :
+     [poids minimum (kg), poids maximum (kg), ml si 80 mg/1 ml, ml si 80 mg/5 ml, ml si 160 mg/5 ml]
+   Le protocole : dose maximale 15 mg/kg/dose, répéter aux 4 à 6 heures,
+   maximum 5 doses par 24 heures.
+   ATTENTION : si le protocole change, vérifier CHAQUE ligne avec le PDF.
+*/
+const TABLEAU_DOSES = [
+  [4.3, 5.3, 0.8, 4, 2.0],
+  [5.4, 6.3, 1.0, 5, 2.5],
+  [6.4, 7.4, 1.2, 6, 3.0],
+  [7.5, 8.5, 1.4, 7, 3.5],
+  [8.6, 9.5, 1.6, 8, 4.0],
+  [9.6, 10.6, 1.8, 9, 4.5],
+  [10.7, 11.7, 2.0, 10, 5.0],
+  [11.8, 12.7, 2.2, 11, 5.5],
+  [12.8, 13.8, 2.4, 12, 6.0],
+  [13.9, 14.9, 2.6, 13, 6.5],
+  [15.0, 15.9, 2.8, 14, 7.0],
+  [16.0, 17.0, 3.0, 15, 7.5],
+  [17.1, 18.1, 3.2, 16, 8.0],
+  [18.2, 19.1, 3.4, 17, 8.5],
+  [19.2, 20.2, 3.6, 18, 9.0],
+  [20.3, 21.3, 3.8, 19, 9.5],
+  [21.4, 22.3, 4.0, 20, 10.0],
+  [22.4, 23.4, 4.2, 21, 10.5],
+  [23.5, 24.5, 4.4, 22, 11.0],
+  [24.6, 25.5, 4.6, 23, 11.5],
+  [25.6, 26.6, 4.8, 24, 12.0],
+  [26.7, 27.7, 5.0, 25, 12.5],
+  [27.8, 28.7, 5.2, 26, 13.0],
+  [28.8, 29.8, 5.4, 27, 13.5],
+  [29.9, 30.9, 5.6, 28, 14.0],
+  [31.0, 31.9, 5.8, 29, 14.5],
+  [32.0, 33.0, 6.0, 30, 15.0],
+  [33.1, 34.1, 6.2, 31, 15.5],
+  [34.2, 35.1, 6.4, 32, 16.0]
+];
+
+// Pour chaque concentration : dans quelle colonne du tableau se trouve la dose
+// (on compte à partir de 0 : colonne 0 = poids min, 1 = poids max, 2 = 80/1, etc.)
+const COLONNE_CONCENTRATION = { "80/1": 2, "80/5": 3, "160/5": 4 };
+const NOM_CONCENTRATION = { "80/1": "80 mg / 1 ml", "80/5": "80 mg / 5 ml", "160/5": "160 mg / 5 ml" };
+
+
+/* ---------------------------------------------------------------------
+   3.6 PETITES FONCTIONS UTILES
+   ---------------------------------------------------------------------
+   Une « fonction » est un ensemble d'instructions avec un nom.
+   On l'écrit une fois, puis on l'utilise (« l'appelle ») autant qu'on veut.
+*/
+
+// Trouver un élément de la page. Exemple : trouver("#formulaire") trouve l'élément id="formulaire".
+// (Le # veut dire « id »; un point . voudrait dire « classe ».)
+function trouver(selecteur) {
+  return document.querySelector(selecteur);
+}
+
+const formulaire = trouver("#formulaire");
+
+// Lire TOUTES les réponses du formulaire d'un coup.
+// Résultat : un objet du genre { nom: "CPE Soleil", age: "2", vomissements: "non", ... }
+// Une question sans réponse n'apparaît pas dans l'objet.
+// Pour en savoir plus sur FormData :
+//   https://developer.mozilla.org/fr/docs/Web/API/FormData/Utilisation_objets_FormData
+function lireReponses() {
+  const reponses = {};
+  const donnees = new FormData(formulaire);
+  for (const [nom, valeur] of donnees) {
+    reponses[nom] = valeur.trim();   // trim() enlève les espaces au début et à la fin
+  }
+  return reponses;
+}
+
+// Transformer un texte en nombre. Accepte la virgule (38,5) ou le point (38.5).
+// Si c'est vide, on retourne NaN (« Not a Number » = « pas un nombre »).
+function nombre(valeur) {
+  if (valeur === undefined || valeur === null || valeur === "") {
+    return NaN;
+  }
+  return parseFloat(String(valeur).replace(",", "."));
+}
+
+// Écrire un nombre avec une virgule (format québécois) : 2.5 devient "2,5".
+function avecVirgule(valeur) {
+  return String(valeur).replace(".", ",");
+}
+
+// Âge de l'enfant en MOIS (2 ans = 24 mois). NaN si l'âge n'est pas rempli.
+function ageEnMois(reponses) {
+  const age = nombre(reponses.age);
+  if (isNaN(age)) {
+    return NaN;
+  }
+  if (reponses.uniteAge === "mois") {
+    return age;
+  }
+  return age * 12;
+}
+
+// SÉCURITÉ : avant d'afficher dans la page un texte tapé par quelqu'un,
+// on remplace les caractères spéciaux (< > & " ') par leur version « sans danger ».
+// Sinon, quelqu'un pourrait taper du code HTML qui s'exécuterait dans la page.
+// Ne jamais enlever cette fonction.
+function echapper(texte) {
+  if (texte === undefined || texte === null) {
+    texte = "";
+  }
+  return String(texte)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+
+/* ---------------------------------------------------------------------
+   3.7 DÉFINITION DE LA FIÈVRE (tableau de la fiche)
+   ---------------------------------------------------------------------
+   Cette fonction répond à : « Avec cette température, cette voie et cet âge,
+   y a-t-il de la fièvre? »
+   Elle retourne :
+     true            = oui, fièvre
+     false           = non, pas de fièvre
+     null            = on ne peut pas encore savoir (température ou voie manquante)
+     "pas-d-age"     = il manque l'âge
+     "voie-invalide" = cette voie n'est pas définie pour cet âge
+   Les seuils (38.0, 38.5, 37.5) et les âges (3 mois, 60 mois = 5 ans) viennent
+   de la fiche. ATTENTION : en JavaScript, on écrit 38.5 avec un POINT.
+   Si un seuil change, changer aussi : le texte du seuil (section 3.10) et le
+   tableau « Définition de la fièvre » dans le HTML.
+*/
+function aDeLaFievre(temperature, voie, mois) {
+  if (isNaN(temperature) || !voie) {
+    return null;
+  }
+  if (isNaN(mois)) {
+    return "pas-d-age";
+  }
+
+  // Moins de 3 mois : seulement par le rectum, fièvre à 38,0 °C et plus
+  if (mois < 3) {
+    if (voie === "rectum") {
+      return temperature >= 38.0;
+    }
+    return "voie-invalide";
+  }
+
+  // 3 mois et plus
+  if (voie === "rectum") {
+    return temperature >= 38.5;
+  }
+  if (voie === "bouche") {
+    if (mois >= 60) {
+      return temperature >= 38.0;   // bouche : seulement 5 ans et plus
+    }
+    return "voie-invalide";
+  }
+  if (voie === "aisselle") {
+    return temperature >= 37.5;
+  }
+  return null;
+}
+
+
+/* ---------------------------------------------------------------------
+   3.8 LA DÉCISION : la fiche « Critères d'exclusion » en code
+   ---------------------------------------------------------------------
+   C'est la fonction la plus importante. Elle lit les réponses et décide :
+     - "exclure"     s'il y a au moins un motif d'exclusion
+     - "attendre"    s'il faut reprendre la température dans 1 heure
+     - "incomplet"   s'il manque des réponses
+     - "pas-exclure" si tout est répondu et qu'aucun motif n'est trouvé
+   Elle retourne aussi la liste des motifs, ce qui manque et des notes.
+*/
+function evaluer(reponses) {
+  const mois = ageEnMois(reponses);
+  const motifs = [];     // les motifs d'exclusion trouvés (codes de la liste MOTIFS)
+  const manquant = [];   // ce qu'il reste à répondre
+  const notes = [];      // remarques à afficher dans « À noter »
+  let messageAttente = null;
+  let fievre = null;     // fièvre à la première prise
+  let fievre2 = null;    // fièvre 1 heure après
+
+  // --- Étape 1 : la fièvre ---
+  if (reponses.mesure === "oui") {
+    fievre = aDeLaFievre(nombre(reponses.temp), reponses.voie, mois);
+
+    if (fievre === null) {
+      manquant.push("la température et la voie");
+    } else if (fievre === "pas-d-age") {
+      manquant.push("l'âge de l'enfant");
+    } else if (fievre === "voie-invalide") {
+      if (mois < 3) {
+        notes.push("Moins de 3 mois : seule la température rectale est définie. Reprenez-la par le rectum.");
+      } else {
+        notes.push("La voie buccale s'applique seulement à 5 ans et plus. Reprenez la température par le rectum ou l'aisselle.");
+      }
+    } else if (fievre === true && reponses.voie === "aisselle") {
+      notes.push("Température à l'aisselle : vous pouvez la confirmer par le rectum, plus fiable.");
+    }
+
+    if (fievre === true && !reponses.lieu) {
+      manquant.push("où la fièvre a été remarquée");
+    } else if (fievre === true) {
+      // Il y a de la fièvre : la suite dépend d'où elle a été remarquée (branches de la fiche)
+      if (reponses.lieu === "maison") {
+        motifs.push("fievre_maison");
+      } else if (reponses.lieu === "ecole") {
+        motifs.push("fievre_ecole");
+      } else if (mois < 3) {
+        motifs.push("fievre_bebe");          // au milieu de garde, moins de 3 mois
+      } else {
+        // Au milieu de garde, 3 mois et plus : on regarde la température 1 heure après
+        fievre2 = aDeLaFievre(nombre(reponses.temp2), reponses.voie, mois);
+        if (fievre2 === true) {
+          motifs.push("fievre_persistante");
+        } else if (fievre2 === false) {
+          notes.push("La fièvre n'est plus présente 1 heure après.");
+        } else {
+          messageAttente = "Si indiqué, donnez de l'acétaminophène selon le protocole et reprenez la température dans 1 heure.";
+        }
+      }
+    }
+  } else if (reponses.mesure === "non") {
+    notes.push("La température n'a pas été prise. Prenez-la (par le rectum de préférence) pour compléter l'évaluation.");
+  } else {
+    manquant.push("si la température a été prise");
+  }
+
+  // --- Étape 2 : les 5 autres critères (un seul « oui » suffit pour exclure) ---
+  let nombreSansReponse = 0;
+  for (const critere of CRITERES) {
+    if (reponses[critere] === "oui") {
+      motifs.push(critere);
+    } else if (reponses[critere] !== "non") {
+      nombreSansReponse = nombreSansReponse + 1;
+    }
+  }
+  if (nombreSansReponse === 1) {
+    manquant.push("1 des autres critères");
+  } else if (nombreSansReponse > 1) {
+    manquant.push(nombreSansReponse + " des autres critères");
+  }
+
+  // --- Étape 3 : le diagnostic (ne change pas la décision, seulement la priorité) ---
+  const diagnostic = infoDiagnostic(reponses);
+  if (!reponses.diagnostic) {
+    manquant.push("si un diagnostic a été posé");
+  } else if (reponses.diagnostic === "oui" && !diagnostic.maladie) {
+    manquant.push("le diagnostic");
+  }
+
+  // --- Étape 4 : la décision finale ---
+  let etat;
+  if (motifs.length > 0) {
+    etat = "exclure";
+  } else if (messageAttente) {
+    etat = "attendre";
+  } else if (manquant.length > 0) {
+    etat = "incomplet";
+  } else {
+    etat = "pas-exclure";
+  }
+
+  return {
+    etat: etat,
+    motifs: motifs,
+    manquant: manquant,
+    notes: notes,
+    messageAttente: messageAttente,
+    fievre: fievre,
+    fievre2: fievre2,
+    mois: mois,
+    diagnostic: diagnostic
+  };
+}
+
+// Le diagnostic choisi, et s'il fait partie de la liste MADO.
+function infoDiagnostic(reponses) {
+  let maladie = "";
+  if (reponses.diagnostic === "oui") {
+    if (reponses.maladie === "autre") {
+      maladie = reponses.maladieAutre || "";
+    } else {
+      maladie = reponses.maladie || "";
+    }
+  }
+  return {
+    statut: reponses.diagnostic || "",
+    maladie: maladie,
+    mado: reponses.diagnostic === "oui" && MADO.includes(reponses.maladie)
+  };
+}
+
+// Ajouter les maladies dans la liste déroulante « Diagnostic » (appelée une fois au démarrage).
+// <optgroup> = un groupe avec un titre dans une liste déroulante.
+function remplirListeMaladies() {
+  const liste = trouver("#champ-maladie");
+
+  function ajouterGroupe(titre, maladies) {
+    const groupe = document.createElement("optgroup");
+    groupe.label = titre;
+    for (const maladie of maladies) {
+      const option = document.createElement("option");
+      option.value = maladie;
+      option.textContent = maladie;
+      groupe.appendChild(option);
+    }
+    liste.appendChild(groupe);
+  }
+
+  ajouterGroupe("Maladies à déclaration obligatoire (MADO)", MADO);
+  ajouterGroupe("Autres maladies fréquentes", AUTRES_MALADIES);
+
+  const optionAutre = document.createElement("option");
+  optionAutre.value = "autre";
+  optionAutre.textContent = "Autre (préciser)";
+  liste.appendChild(optionAutre);
+}
+
+
+/* ---------------------------------------------------------------------
+   3.9 LE PROTOCOLE D'ACÉTAMINOPHÈNE
+   ---------------------------------------------------------------------
+   Vérifie si le protocole permet de donner de l'acétaminophène, puis trouve
+   la dose dans TABLEAU_DOSES selon le poids et la concentration.
+   Retourne un objet avec « resultat » :
+     "ne-pas-donner" : une règle du protocole l'interdit (liste « raisons »)
+     "hors-tableau"  : le poids n'est pas dans le tableau (4,3 à 35,1 kg)
+     "dose"          : la dose trouvée (ml)
+     "incomplet"     : il manque des réponses
+*/
+function verifierAcetaminophene(reponses) {
+  const raisons = [];
+  if (reponses.ac_formulaire === "non") {
+    raisons.push("le parent n'a pas signé le formulaire d'autorisation");
+  }
+  if (reponses.ac_allergie === "oui") {
+    raisons.push("allergie connue à l'acétaminophène");
+  }
+  if (reponses.ac_4h === "oui") {
+    raisons.push("acétaminophène (ou médicament qui en contient) reçu dans les 4 dernières heures");
+  }
+  if (reponses.ac_4h === "inconnu") {
+    raisons.push("on ne sait pas si un médicament contenant de l'acétaminophène a été donné dans les 4 dernières heures : vérifiez avec le parent");
+  }
+  if (reponses.ac_48h === "oui") {
+    raisons.push("acétaminophène donné depuis plus de 48 heures");
+  }
+  if (raisons.length > 0) {
+    return { resultat: "ne-pas-donner", raisons: raisons };
+  }
+
+  if (!reponses.ac_formulaire || !reponses.ac_allergie || !reponses.ac_4h || !reponses.ac_48h) {
+    return { resultat: "incomplet" };
+  }
+
+  // Le poids est arrondi VERS LE BAS au dixième (ex. : 5,35 kg devient 5,3 kg).
+  // Choix de prudence : on ne tombe jamais dans une tranche plus lourde (dose plus forte).
+  // (Le + 0.000000001 corrige une petite erreur d'arrondi des ordinateurs.)
+  const poids = Math.floor(nombre(reponses.ac_poids) * 10 + 0.000000001) / 10;
+  if (isNaN(poids) || !reponses.ac_concentration) {
+    return { resultat: "incomplet", aIndiquer: "le poids et la concentration" };
+  }
+
+  // Chercher la ligne du tableau où le poids se trouve entre le minimum et le maximum.
+  let ligneTrouvee = null;
+  for (const ligne of TABLEAU_DOSES) {
+    if (poids >= ligne[0] && poids <= ligne[1]) {
+      ligneTrouvee = ligne;
+    }
+  }
+  if (ligneTrouvee === null) {
+    return { resultat: "hors-tableau", poids: poids };
+  }
+
+  const colonne = COLONNE_CONCENTRATION[reponses.ac_concentration];
+  return {
+    resultat: "dose",
+    poids: poids,
+    concentration: reponses.ac_concentration,
+    ml: ligneTrouvee[colonne],
+    poidsMin: ligneTrouvee[0],
+    poidsMax: ligneTrouvee[1]
+  };
+}
+
+// Écrire le HTML du résultat du protocole (la boîte verte ou saumon).
+function htmlAcetaminophene(verif) {
+  if (verif.resultat === "ne-pas-donner") {
+    let liste = "";
+    for (const raison of verif.raisons) {
+      liste += "<li>" + echapper(raison) + "</li>";
+    }
+    return `<div class="resultat-acetaminophene ne-pas-donner">
+      <b>Ne pas donner d'acétaminophène selon le protocole.</b>
+      <ul>${liste}</ul>
+      <p>Il faudrait l'autorisation écrite d'un professionnel de la santé et du parent. Surveillez l'enfant et reprenez la température dans 1 heure.</p>
+    </div>`;
+  }
+
+  if (verif.resultat === "hors-tableau") {
+    return `<div class="resultat-acetaminophene ne-pas-donner">
+      <b>Le poids inscrit (${avecVirgule(verif.poids)} kg) n'est pas dans le tableau du protocole (4,3 à 35,1 kg).</b>
+      <p>Ne donnez pas d'acétaminophène selon le protocole. Vérifiez le poids avec le parent ou demandez l'avis d'un professionnel de la santé.</p>
+    </div>`;
+  }
+
+  if (verif.resultat === "dose") {
+    // On écrit la dose comme dans le tableau du PDF : 80 mg/5 ml sans décimale (ex. 11 ml),
+    // les autres avec une décimale (ex. 2,0 ml).
+    let doseTexte;
+    if (verif.concentration === "80/5") {
+      doseTexte = String(verif.ml);
+    } else {
+      doseTexte = verif.ml.toFixed(1);
+    }
+    return `<div class="resultat-acetaminophene dose-ok">
+      <span class="etiquette">Dose selon le tableau du protocole</span>
+      <div class="dose">${avecVirgule(doseTexte)} ml</div>
+      <p>de ${NOM_CONCENTRATION[verif.concentration]}, pour un poids de ${avecVirgule(verif.poidsMin)} à ${avecVirgule(verif.poidsMax)} kg.</p>
+      <ul>
+        <li>Vérifiez le nom du produit (acétaminophène seul), la concentration et la date d'expiration sur le contenant.</li>
+        <li>Mesurez avec une seringue orale ou un compte-gouttes gradué en ml. Jamais de cuillère de cuisine.</li>
+        <li>Ne jamais dépasser cette dose. Au moins 4 heures entre deux doses, maximum 5 doses par 24 heures.</li>
+        <li>Inscrivez la dose et l'heure à la fiche de l'enfant et informez le parent le jour même.</li>
+      </ul>
+      <p class="petit-texte">Dose trop élevée donnée par erreur : appelez immédiatement le Centre antipoison du Québec, <b>1 800 463-5060</b>, et avisez le parent.</p>
+    </div>`;
+  }
+
+  // Résultat « incomplet »
+  if (verif.aIndiquer) {
+    return `<p class="petit-texte">Indiquez ${echapper(verif.aIndiquer)} pour voir la dose.</p>`;
+  }
+  return `<p class="petit-texte">Répondez aux questions pour savoir si l'acétaminophène peut être donné.</p>`;
+}
+
+
+/* ---------------------------------------------------------------------
+   3.10 AFFICHER / CACHER LES PARTIES DU FORMULAIRE
+   ---------------------------------------------------------------------
+   Exemple : la zone « Température » n'apparaît que si « Oui, prise » est coché.
+   On utilise element.hidden = true (caché) ou false (visible).
+   Pour en savoir plus sur l'attribut hidden :
+     https://developer.mozilla.org/fr/docs/Web/HTML/Global_attributes/hidden
+*/
+function mettreAJourFormulaire(reponses, decision) {
+  const mois = ageEnMois(reponses);
+
+  // Zone de température
+  trouver("#zone-temperature").hidden = (reponses.mesure !== "oui");
+
+  // Voies permises selon l'âge : bouche seulement à 5 ans et plus, aisselle à 3 mois et plus
+  const boutonBouche = trouver("#voie-bouche");
+  const boutonAisselle = trouver("#voie-aisselle");
+  const bebe = !isNaN(mois) && mois < 3;
+  const moinsDe5Ans = !isNaN(mois) && mois < 60;
+  boutonBouche.disabled = bebe || moinsDe5Ans;
+  boutonAisselle.disabled = bebe;
+  if (boutonBouche.disabled && boutonBouche.checked) {
+    boutonBouche.checked = false;
+  }
+  if (boutonAisselle.disabled && boutonAisselle.checked) {
+    boutonAisselle.checked = false;
+  }
+
+  const aideVoie = trouver("#aide-voie");
+  if (bebe) {
+    aideVoie.textContent = "Moins de 3 mois : température par le rectum seulement.";
+  } else if (moinsDe5Ans) {
+    aideVoie.textContent = "Moins de 5 ans : rectum ou aisselle. Le rectum est le plus fiable.";
+  } else {
+    aideVoie.textContent = "La température par le rectum est la plus fiable.";
+  }
+
+  // Message « Fièvre / Pas de fièvre selon la définition », avec le seuil utilisé
+  const message = trouver("#message-fievre");
+  if (reponses.mesure === "oui" && (decision.fievre === true || decision.fievre === false)) {
+    let seuil;
+    if (mois < 3) {
+      seuil = "38,0 °C par le rectum (moins de 3 mois)";
+    } else if (reponses.voie === "rectum") {
+      seuil = "38,5 °C par le rectum (3 mois et plus)";
+    } else if (reponses.voie === "bouche") {
+      seuil = "38,0 °C par la bouche (5 ans et plus)";
+    } else {
+      seuil = "37,5 °C à l'aisselle (3 mois et plus)";
+    }
+    message.hidden = false;
+    if (decision.fievre) {
+      message.className = "message-fievre fievre";
+      message.textContent = "Fièvre selon la définition · seuil : " + seuil;
+    } else {
+      message.className = "message-fievre pas-de-fievre";
+      message.textContent = "Pas de fièvre selon la définition · seuil : " + seuil;
+    }
+  } else if (decision.fievre === "voie-invalide") {
+    message.hidden = false;
+    message.className = "message-fievre attention";
+    message.textContent = "Voie non valide pour cet âge";
+  } else {
+    message.hidden = true;
+  }
+
+  // Diagnostic : la liste des maladies, et la zone « Préciser » si « Autre »
+  trouver("#zone-maladie").hidden = (reponses.diagnostic !== "oui");
+  trouver("#zone-maladie-autre").hidden = !(reponses.diagnostic === "oui" && reponses.maladie === "autre");
+
+  // « Où la fièvre a-t-elle été remarquée? » : seulement s'il y a de la fièvre
+  trouver("#zone-lieu-fievre").hidden = !(reponses.mesure === "oui" && decision.fievre === true);
+
+  // Encadré « 1 heure après » + protocole : fièvre au milieu de garde, 3 mois et plus
+  const afficherEncadre = reponses.mesure === "oui" && decision.fievre === true && reponses.lieu === "garde" && mois >= 3;
+  trouver("#encadre-reprise").hidden = !afficherEncadre;
+  if (afficherEncadre) {
+    trouver("#resultat-acetaminophene").innerHTML = htmlAcetaminophene(verifierAcetaminophene(reponses));
+  }
+}
+
+
+/* ---------------------------------------------------------------------
+   3.11 ÉCRIRE LA RECOMMANDATION (colonne de droite)
+   ---------------------------------------------------------------------
+   On construit le HTML sous forme de texte, puis on le met dans la page.
+   Les textes entre accents graves ` ` peuvent contenir ${...} : ce qui est
+   entre ${ } est remplacé par sa valeur.
+   Pour en savoir plus (« littéraux de gabarits ») :
+     https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Template_literals
+*/
+
+// Message affiché après avoir cliqué « Envoyer » (vide au départ).
+let messageEnvoi = null;
+
+function htmlRecommandation(reponses, decision) {
+  let html = "";
+
+  // --- 1. La grande boîte de couleur ---
+  if (decision.etat === "exclure") {
+    let consigne;
+    if (reponses.lieu === "maison") {
+      consigne = "L'enfant doit rester à la maison.";
+    } else {
+      consigne = "Appelez le parent pour qu'il vienne chercher l'enfant. L'enfant reste à la maison jusqu'à ce que les conditions de retour soient remplies.";
+    }
+    html += `<div class="statut exclure">
+      <span class="etiquette">Recommandation temporaire</span>
+      <h3>Exclure l'enfant du milieu</h3>
+      <p>${consigne}</p>
+    </div>`;
+  } else if (decision.etat === "attendre") {
+    html += `<div class="statut attendre">
+      <span class="etiquette">À réévaluer</span>
+      <h3>Reprendre la température dans 1 heure</h3>
+      <p>${echapper(decision.messageAttente)}</p>
+      <p>Si la fièvre est toujours présente, l'enfant sera exclu. Revenez inscrire la température dans cette fiche.</p>
+    </div>`;
+  } else if (decision.etat === "pas-exclure") {
+    html += `<div class="statut pas-exclure">
+      <span class="etiquette">Recommandation temporaire</span>
+      <h3>Pas besoin d'exclure l'enfant</h3>
+      <p>Surveillez son état de santé.</p>
+    </div>`;
+  } else {
+    html += `<div class="statut incomplet">
+      <span class="etiquette">Recommandation</span>
+      <h3>Répondez aux questions</h3>
+      <p>La recommandation se met à jour à chaque réponse. Une seule réponse « oui » suffit pour exclure l'enfant.</p>
+    </div>`;
+  }
+
+  // --- 2. Le diagnostic (juste sous la grande boîte) ---
+  const diagnostic = decision.diagnostic;
+  if (diagnostic.mado) {
+    let contact = "";
+    if (CONFIG.contactBrigade) {
+      contact = " Vous pouvez aussi joindre la brigade : <b>" + echapper(CONFIG.contactBrigade) + "</b>.";
+    }
+    html += `<div class="boite-mado">
+      <span class="etiquette">Priorité · maladie à déclaration obligatoire</span>
+      <h3>${echapper(diagnostic.maladie)}</h3>
+      <p>Ce diagnostic est une maladie à déclaration obligatoire (MADO). Le signalement sera marqué <b>prioritaire</b> pour la brigade. La santé publique pourrait demander des mesures supplémentaires (par exemple : durée d'exclusion différente, avis aux parents, vérification de la vaccination).</p>
+      <p>En attendant, appliquez la recommandation ci-dessus et envoyez le signalement sans tarder.${contact}</p>
+    </div>`;
+  } else if (diagnostic.statut === "oui" && diagnostic.maladie) {
+    html += `<div class="boite">
+      <h4>Diagnostic indiqué</h4>
+      <p><b>${echapper(diagnostic.maladie)}</b>. La brigade vérifiera s'il existe des consignes propres à cette maladie et vous recontactera au besoin. Suivez aussi les consignes du professionnel de la santé.</p>
+    </div>`;
+  } else if (diagnostic.statut === "attente") {
+    html += `<div class="boite">
+      <h4>Diagnostic à venir</h4>
+      <p>Si un diagnostic est posé, informez la brigade ou faites un nouveau signalement.</p>
+    </div>`;
+  }
+
+  // --- 3. Détails selon la décision ---
+  if (decision.etat === "exclure") {
+    // Bébé de moins de 3 mois avec fièvre : consignes spéciales du protocole d'acétaminophène
+    if (decision.motifs.includes("fievre_bebe")) {
+      html += `<div class="boite saumon">
+        <h4>Enfant de moins de 3 mois</h4>
+        <ul>
+          <li><b>Prévenez immédiatement le parent</b> et demandez-lui de venir chercher l'enfant. Une consultation médicale est nécessaire.</li>
+          <li>Ne donnez pas d'acétaminophène sans l'autorisation d'un professionnel de la santé et du parent.</li>
+          <li>Habillez l'enfant légèrement, faites-le boire plus souvent et reprenez la température après 60 minutes, ou plus tôt si son état se détériore.</li>
+          <li>Si personne ne peut être joint, conduisez l'enfant à l'urgence d'un centre hospitalier.</li>
+        </ul>
+      </div>`;
+    } else if (reponses.lieu !== "maison") {
+      html += `<p class="petit-texte" style="color: var(--texte)">Si vous ne pouvez pas joindre le parent, appelez les personnes désignées en cas d'urgence. Si personne ne peut être joint, conduisez l'enfant à l'urgence d'un centre hospitalier.</p>`;
+    }
+
+    // Pourquoi : la liste des motifs trouvés
+    let listePourquoi = "";
+    for (const motif of decision.motifs) {
+      listePourquoi += "<li>" + echapper(MOTIFS[motif].texte) + "</li>";
+    }
+    html += `<div class="boite"><h4>Pourquoi</h4><ul>${listePourquoi}</ul></div>`;
+
+    // Conditions de retour : toutes affichées, celles qui s'appliquent en gras + « (applicable) »
+    const retoursApplicables = [];
+    for (const motif of decision.motifs) {
+      retoursApplicables.push(MOTIFS[motif].retour);
+    }
+    let listeRetour = "";
+    for (const condition of CONDITIONS_RETOUR) {
+      if (retoursApplicables.includes(condition.code)) {
+        listeRetour += `<li class="applicable">${echapper(condition.texte)} <span class="mention-applicable">(applicable)</span></li>`;
+      } else {
+        listeRetour += `<li>${echapper(condition.texte)}</li>`;
+      }
+    }
+    html += `<div class="boite saumon"><h4>Retour permis quand toutes ces conditions sont remplies</h4><ul>${listeRetour}</ul></div>`;
+  }
+
+  if (decision.etat === "pas-exclure") {
+    html += `<div class="boite">
+      <h4>Rehaussez les pratiques de base</h4>
+      <ul>
+        <li>Hygiène des mains</li>
+        <li>Hygiène et étiquette respiratoires</li>
+        <li>Nettoyage et désinfection des objets, des surfaces et des locaux</li>
+      </ul>
+      <p class="petit-texte">Si l'état de l'enfant change, refaites l'évaluation.</p>
+    </div>`;
+  }
+
+  // --- 4. À noter, ce qui manque, le message d'envoi, et « Ensuite » ---
+  if (decision.notes.length > 0) {
+    let listeNotes = "";
+    for (const note of decision.notes) {
+      listeNotes += "<li>" + echapper(note) + "</li>";
+    }
+    html += `<div class="boite"><h4>À noter</h4><ul>${listeNotes}</ul></div>`;
+  }
+
+  if (decision.manquant.length > 0) {
+    if (decision.etat === "incomplet") {
+      html += `<p class="manquant">À compléter : ${echapper(decision.manquant.join(", "))}.</p>`;
+    } else {
+      html += `<p class="manquant">Il manque encore : ${echapper(decision.manquant.join(", "))}.</p>`;
+    }
+  }
+
+  if (messageEnvoi) {
+    html += messageEnvoi;
+  }
+
+  html += `<div class="boite">
+    <h4>Ensuite</h4>
+    <p class="petit-texte" style="color: var(--texte)">Cette recommandation est temporaire. Le signalement est transmis à la brigade de santé publique, qui vous contactera au besoin pour confirmer ou ajuster les consignes. Si d'autres enfants développent les mêmes symptômes, faites un nouveau signalement.</p>
+  </div>`;
+
+  return html;
+}
+
+
+/* ---------------------------------------------------------------------
+   3.12 METTRE LA PAGE À JOUR À CHAQUE RÉPONSE
+   ---------------------------------------------------------------------
+   « addEventListener » = « quand il se passe telle chose, fais ceci ».
+   Ici : chaque fois qu'on répond à une question, on recalcule tout.
+   Pour en savoir plus :
+     https://developer.mozilla.org/fr/docs/Web/API/EventTarget/addEventListener
+*/
+function rafraichir() {
+  // 1. Lire les réponses et décider une première fois
+  let reponses = lireReponses();
+  let decision = evaluer(reponses);
+
+  // 2. Afficher / cacher les parties du formulaire
+  //    (ça peut décocher une voie qui n'est plus permise, donc on relit après)
+  mettreAJourFormulaire(reponses, decision);
+  reponses = lireReponses();
+  decision = evaluer(reponses);
+
+  // 3. Écrire la recommandation à droite
+  trouver("#recommandation").innerHTML = htmlRecommandation(reponses, decision);
+
+  // 4. Mettre à jour la barre du téléphone
+  const pastille = trouver("#pastille-telephone");
+  pastille.className = "pastille " + decision.etat;
+  if (decision.etat === "incomplet") {
+    pastille.textContent = "En cours de saisie";
+  } else {
+    pastille.textContent = TEXTE_COURT[decision.etat];
+  }
+
+  // 5. Mémoriser les coordonnées du milieu
+  sauverMilieu(reponses);
+
+  return { reponses: reponses, decision: decision };
+}
+
+// « input » = on tape ou on coche quelque chose
+formulaire.addEventListener("input", function () {
+  messageEnvoi = null;   // on efface le message d'envoi : les réponses ont changé
+  rafraichir();
+  effacerErreurs();
+});
+
+// « change » = une liste déroulante ou une date a changé
+formulaire.addEventListener("change", function () {
+  rafraichir();
+});
+
+
+/* ---------------------------------------------------------------------
+   3.13 MÉMORISER LES COORDONNÉES DU MILIEU
+   ---------------------------------------------------------------------
+   Le nom, le contact, le téléphone, le type et la brigade sont gardés dans
+   le navigateur de CET appareil (localStorage), pour ne pas les retaper.
+   Rien sur l'enfant n'est gardé. Rien n'est envoyé ailleurs.
+   « try / catch » : si le navigateur refuse (navigation privée), on ignore l'erreur.
+   Pour en savoir plus :
+     https://developer.mozilla.org/fr-FR/docs/Web/API/Window/localStorage
+*/
+const CLE_MEMOIRE = "exclusion-garde-milieu";
+
+function sauverMilieu(reponses) {
+  try {
+    let brigade = reponses.brigade || "";
+    if (BRIGADE_DU_LIEN) {
+      brigade = "";   // la brigade vient du lien : inutile de la mémoriser
+    }
+    const milieu = {
+      type: reponses.type || "",
+      nom: reponses.nom || "",
+      contact: reponses.contact || "",
+      tel: reponses.tel || "",
+      brigade: brigade
+    };
+    localStorage.setItem(CLE_MEMOIRE, JSON.stringify(milieu));
+  } catch (erreur) {
+    // On ne fait rien : la mémoire n'est qu'un confort.
+  }
+}
+
+function chargerMilieu() {
+  try {
+    const texte = localStorage.getItem(CLE_MEMOIRE);
+    if (!texte) {
+      return;
+    }
+    const milieu = JSON.parse(texte);
+    if (milieu.nom) formulaire.elements.nom.value = milieu.nom;
+    if (milieu.contact) formulaire.elements.contact.value = milieu.contact;
+    if (milieu.tel) formulaire.elements.tel.value = milieu.tel;
+    if (milieu.brigade && !BRIGADE_DU_LIEN) {
+      formulaire.elements.brigade.value = milieu.brigade;
+    }
+    if (milieu.type) {
+      cocher("type", milieu.type);
+    }
+  } catch (erreur) {
+    // On ne fait rien.
+  }
+}
+
+// Cocher le bouton radio « nom » qui a la valeur « valeur ».
+function cocher(nom, valeur) {
+  const boutons = formulaire.querySelectorAll('input[name="' + nom + '"]');
+  for (const bouton of boutons) {
+    bouton.checked = (bouton.value === valeur);
+  }
+}
+
+
+/* ---------------------------------------------------------------------
+   BRIGADE : lire le lien et préparer le champ « Brigade ou territoire »
+   ---------------------------------------------------------------------
+   Si l'adresse de la page se termine par ?brigade=12, on remplit la brigade
+   automatiquement et on empêche de la changer.
+   Pour en savoir plus sur la lecture de l'adresse :
+     https://developer.mozilla.org/fr/docs/Web/API/URLSearchParams
+*/
+const BRIGADE_DU_LIEN = (new URLSearchParams(window.location.search).get("brigade") || "").trim();
+
+// Chercher une brigade dans la liste BRIGADES à partir de son code.
+function trouverBrigade(code) {
+  for (const brigade of BRIGADES) {
+    if (String(brigade.code) === String(code || "")) {
+      return brigade;
+    }
+  }
+  return null;
+}
+
+// Texte lisible d'une brigade, ex. : « 12 – Brigade Centre-Sud (CLSC des Faubourgs) »
+function nomBrigade(code) {
+  const brigade = trouverBrigade(code);
+  if (!brigade) {
+    return code || "";
+  }
+  let texte = brigade.code + " – " + brigade.nom;
+  if (brigade.territoire) {
+    texte += " (" + brigade.territoire + ")";
+  }
+  return texte;
+}
+
+// Créer le bon champ « Brigade » (appelée une fois au démarrage).
+function preparerChampBrigade() {
+  const emplacement = trouver("#emplacement-brigade");
+  const aide = trouver("#aide-brigade");
+
+  if (BRIGADE_DU_LIEN) {
+    // Cas 1 : la brigade vient du lien → zone de texte en lecture seule
+    emplacement.innerHTML = '<input type="text" id="champ-brigade" name="brigade" readonly>';
+    trouver("#champ-brigade").value = BRIGADE_DU_LIEN;
+    aide.textContent = "Rempli automatiquement par votre lien : " + nomBrigade(BRIGADE_DU_LIEN);
+  } else if (BRIGADES.length > 0) {
+    // Cas 2 : il y a une liste de brigades → liste déroulante
+    let options = '<option value="">Choisir…</option>';
+    for (const brigade of BRIGADES) {
+      options += '<option value="' + echapper(brigade.code) + '">' + echapper(nomBrigade(brigade.code)) + "</option>";
+    }
+    emplacement.innerHTML = '<select id="champ-brigade" name="brigade">' + options + "</select>";
+    aide.textContent = "Choisissez la brigade qui dessert votre milieu.";
+  } else {
+    // Cas 3 : pas de liste → zone de texte libre
+    emplacement.innerHTML = '<input type="text" id="champ-brigade" name="brigade" placeholder="Ex. : CLSC, quartier ou nom de la brigade">';
+    aide.textContent = "Si vous la connaissez.";
+  }
+}
+
+
+/* ---------------------------------------------------------------------
+   3.14 VÉRIFIER LES RÉPONSES AVANT L'ENVOI
+   ---------------------------------------------------------------------
+   Retourne la liste de ce qui manque. Les champs manquants sont colorés en rouge.
+*/
+function effacerErreurs() {
+  const elementsEnRouge = formulaire.querySelectorAll(".invalide");
+  for (const element of elementsEnRouge) {
+    element.classList.remove("invalide");
+  }
+  trouver("#message-erreur").hidden = true;
+}
+
+function verifierReponses(reponses, decision) {
+  const aCompleter = [];
+
+  // Champs texte obligatoires : on colore leur « champ » en rouge s'ils sont vides
+  const obligatoires = [
+    { nom: "nom", texte: "nom du milieu" },
+    { nom: "tel", texte: "téléphone" },
+    { nom: "age", texte: "âge" }
+  ];
+  for (const obligatoire of obligatoires) {
+    if (!reponses[obligatoire.nom]) {
+      aCompleter.push(obligatoire.texte);
+      formulaire.elements[obligatoire.nom].closest(".champ").classList.add("invalide");
+    }
+  }
+
+  if (decision.fievre === true && !reponses.lieu) {
+    aCompleter.push("où la fièvre a été remarquée");
+  }
+  if (!reponses.mesure) {
+    aCompleter.push("température prise ou non");
+  }
+  if (reponses.mesure === "oui" && (isNaN(nombre(reponses.temp)) || !reponses.voie)) {
+    aCompleter.push("température et voie");
+  }
+  if (!reponses.diagnostic) {
+    aCompleter.push("diagnostic posé ou non");
+  } else if (reponses.diagnostic === "oui" && !decision.diagnostic.maladie) {
+    aCompleter.push("le diagnostic");
+  }
+
+  let critereManquant = false;
+  for (const critere of CRITERES) {
+    if (!reponses[critere]) {
+      critereManquant = true;
+      trouver('.critere[data-critere="' + critere + '"]').classList.add("invalide");
+    }
+  }
+  if (critereManquant) {
+    aCompleter.push("les questions sur l'état de l'enfant");
+  }
+
+  return aCompleter;
+}
+
+
+/* ---------------------------------------------------------------------
+   3.15 PRÉPARER LE SIGNALEMENT ET LE RÉSUMÉ TEXTE
+   ---------------------------------------------------------------------
+   « creerSignalement » rassemble toutes les réponses dans un seul objet.
+   « resumeTexte » le transforme en texte lisible (pour copier ou pour Forms).
+*/
+
+// Identifiant unique de l'évaluation en cours (change quand on clique « Recommencer »).
+function nouvelIdentifiant() {
+  if (window.crypto && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+}
+let identifiantEvaluation = nouvelIdentifiant();
+
+function creerSignalement(reponses, decision) {
+  // Détails du protocole d'acétaminophène (seulement si l'encadré « 1 heure après » s'applique)
+  let acetaminophene = null;
+  if (reponses.lieu === "garde" && decision.fievre === true && decision.mois >= 3) {
+    const verif = verifierAcetaminophene(reponses);
+    let resultat = "";
+    if (verif.resultat === "dose") {
+      resultat = verif.ml + " ml (" + NOM_CONCENTRATION[verif.concentration] + ")";
+    } else if (verif.resultat === "ne-pas-donner") {
+      resultat = "protocole ne s'applique pas";
+    } else if (verif.resultat === "hors-tableau") {
+      resultat = "poids hors tableau";
+    }
+    acetaminophene = {
+      formulaire: reponses.ac_formulaire || "",
+      allergie: reponses.ac_allergie || "",
+      recu4h: reponses.ac_4h || "",
+      plus48h: reponses.ac_48h || "",
+      poids: reponses.ac_poids || "",
+      concentration: reponses.ac_concentration || "",
+      resultat: resultat
+    };
+  }
+
+  const criteres = {};
+  for (const critere of CRITERES) {
+    criteres[critere] = reponses[critere] || "";
+  }
+
+  let lieu = "";
+  if (decision.fievre === true) {
+    lieu = reponses.lieu || "";
+  }
+
+  return {
+    identifiant: identifiantEvaluation,
+    date: new Date().toISOString(),
+    milieu: {
+      type: reponses.type || "",
+      nom: reponses.nom || "",
+      contact: reponses.contact || "",
+      tel: reponses.tel || "",
+      brigade: reponses.brigade || ""
+    },
+    enfant: {
+      age: reponses.age || "",
+      uniteAge: reponses.uniteAge,
+      debut: reponses.debut || "",
+      autres: reponses.autres || ""
+    },
+    fievre: {
+      lieu: lieu,
+      mesure: reponses.mesure || "",
+      temp: reponses.temp || "",
+      voie: reponses.voie || "",
+      acetaminopheneDonne: reponses.aceta || "",
+      acetaminophene: acetaminophene,
+      temp2: reponses.temp2 || "",
+      fievre: decision.fievre,
+      fievre2: decision.fievre2
+    },
+    criteres: criteres,
+    diagnostic: decision.diagnostic,
+    priorite: decision.diagnostic.mado ? "MADO" : "standard",
+    notes: reponses.notes || "",
+    recommandation: {
+      etat: decision.etat,
+      motifs: decision.motifs,
+      notes: decision.notes
+    }
+  };
+}
+
+function resumeTexte(signalement) {
+  function ouiNon(valeur) {
+    if (valeur === "oui") return "Oui";
+    if (valeur === "non") return "Non";
+    return "—";
+  }
+
+  const s = signalement;   // nom court, pour que les lignes ci-dessous soient moins longues
+  const lignes = [];
+
+  if (s.diagnostic.mado) {
+    lignes.push("*** PRIORITÉ – MADO : " + s.diagnostic.maladie + " (indiqué par le milieu, à vérifier) ***");
+  }
+
+  lignes.push("SIGNALEMENT – " + new Date(s.date).toLocaleString("fr-CA"));
+  lignes.push("Milieu : " + s.milieu.nom + " (" + (s.milieu.type || "type non précisé") + ") – " + s.milieu.contact + " – " + s.milieu.tel);
+  lignes.push("Brigade : " + (s.milieu.brigade ? nomBrigade(s.milieu.brigade) : "—"));
+
+  let enfant = "Enfant : " + s.enfant.age + " " + s.enfant.uniteAge;
+  if (s.enfant.debut) {
+    enfant += " – début " + s.enfant.debut;
+  }
+  lignes.push(enfant);
+  lignes.push("Autres cas semblables : " + (s.enfant.autres || "0"));
+  lignes.push("Moment : " + (LIEUX_FIEVRE[s.fievre.lieu] || "—"));
+
+  let temperature = "non prise";
+  if (s.fievre.mesure === "oui") {
+    temperature = s.fievre.temp + " °C (" + s.fievre.voie + ")";
+    if (s.fievre.temp2) {
+      temperature += " · 1 h après : " + s.fievre.temp2 + " °C";
+    }
+    if (s.fievre.acetaminopheneDonne) {
+      temperature += " · acétaminophène : " + (s.fievre.acetaminopheneDonne === "oui" ? "oui" : "non");
+    }
+  }
+  lignes.push("Température : " + temperature);
+
+  if (s.fievre.acetaminophene && s.fievre.acetaminophene.resultat) {
+    let ligne = "Protocole acétaminophène : " + s.fievre.acetaminophene.resultat;
+    if (s.fievre.acetaminophene.poids) {
+      ligne += " – poids " + s.fievre.acetaminophene.poids + " kg";
+    }
+    lignes.push(ligne);
+  }
+
+  lignes.push("État empêche les activités : " + ouiNon(s.criteres.etat));
+  lignes.push("2 vomissements+ en 24 h : " + ouiNon(s.criteres.vomissements));
+  lignes.push("Diarrhée non contenue / sang / mucus / incontinent : " + ouiNon(s.criteres.diarrhee));
+  lignes.push("Lésions avec pus non couvrables : " + ouiNon(s.criteres.lesions));
+  lignes.push("Consigne d'un professionnel : " + ouiNon(s.criteres.consigne));
+
+  let diagnostic = "—";
+  if (s.diagnostic.statut === "oui") {
+    diagnostic = s.diagnostic.maladie + (s.diagnostic.mado ? " (MADO)" : "");
+  } else if (s.diagnostic.statut === "attente") {
+    diagnostic = "consultation à venir";
+  } else if (s.diagnostic.statut === "non") {
+    diagnostic = "aucun";
+  }
+  lignes.push("Diagnostic : " + diagnostic);
+  lignes.push("Notes : " + (s.notes || "—"));
+
+  let recommandation = "RECOMMANDATION TEMPORAIRE : " + TEXTE_COURT[s.recommandation.etat];
+  if (s.recommandation.motifs.length > 0) {
+    const textesMotifs = [];
+    for (const motif of s.recommandation.motifs) {
+      textesMotifs.push(MOTIFS[motif].texte);
+    }
+    recommandation += " – " + textesMotifs.join("; ");
+  }
+  lignes.push(recommandation);
+
+  // join("\n") colle les lignes avec un retour à la ligne entre chacune
+  return lignes.join("\n");
+}
+
+
+/* ---------------------------------------------------------------------
+   3.16 BOUTON « COPIER LE RÉSUMÉ »
+   ---------------------------------------------------------------------
+   Copie le résumé dans le presse-papiers. Si le navigateur refuse, on affiche
+   le résumé à l'écran et on le sélectionne, pour le copier avec Ctrl+C.
+   Pour en savoir plus :
+     https://developer.mozilla.org/fr/docs/Web/API/Clipboard/writeText
+*/
+async function copierTexte(texte, bouton) {
+  try {
+    await navigator.clipboard.writeText(texte);
+    const ancienTexte = bouton.textContent;
+    bouton.textContent = "Copié";
+    setTimeout(function () {
+      bouton.textContent = ancienTexte;   // remettre le texte du bouton après 1,6 seconde
+    }, 1600);
+  } catch (erreur) {
+    messageEnvoi = `<div class="boite-envoi"><h3>Résumé à copier</h3><pre class="resume" id="resume-a-copier">${echapper(texte)}</pre></div>`;
+    rafraichir();
+    const zone = trouver("#resume-a-copier");
+    const selection = window.getSelection();
+    const plage = document.createRange();
+    plage.selectNodeContents(zone);
+    selection.removeAllRanges();
+    selection.addRange(plage);
+  }
+}
+
+trouver("#bouton-copier").addEventListener("click", function (evenement) {
+  const etat = rafraichir();
+  const signalement = creerSignalement(etat.reponses, etat.decision);
+  copierTexte(resumeTexte(signalement), evenement.currentTarget);
+});
+
+
+/* ---------------------------------------------------------------------
+   3.17 MICROSOFT FORMS : construire le lien prérempli
+   ---------------------------------------------------------------------
+   Le lien prérempli de Forms ressemble à :
+     ...ResponsePage.aspx?id=XXXX&r8cc3...=MILIEU&r6ca1...=TEL&...
+   Chaque morceau « rXXXX=MILIEU » correspond à une question du formulaire.
+   On remplace les mots MILIEU, TEL, RECO, RESUME et BRIGADE par les vraies réponses.
+   encodeURIComponent transforme les espaces, accents, etc. pour qu'ils
+   puissent aller dans une adresse web.
+   Pour en savoir plus :
+     https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
+*/
+
+// Le lien Forms à utiliser : celui de la brigade s'il existe, sinon le lien général.
+function lienFormsDeBase(codeBrigade) {
+  const brigade = trouverBrigade(codeBrigade);
+  if (brigade && brigade.form) {
+    return brigade.form;
+  }
+  return CONFIG.formsPrefillUrl || "";
+}
+
+function lienFormsPrerempli(signalement) {
+  const lienDeBase = lienFormsDeBase(signalement.milieu.brigade);
+  if (!lienDeBase) {
+    return "";
+  }
+
+  // Les valeurs à mettre à la place de chaque mot
+  let milieu = signalement.milieu.nom;
+  if (signalement.milieu.type) milieu += " (" + signalement.milieu.type + ")";
+  if (signalement.milieu.contact) milieu += " – " + signalement.milieu.contact;
+
+  let recommandation = TEXTE_COURT[signalement.recommandation.etat];
+  if (signalement.priorite === "MADO") {
+    recommandation += " – PRIORITÉ MADO";
+  }
+
+  const valeurs = {
+    MILIEU: milieu,
+    TEL: signalement.milieu.tel || "",
+    RECO: recommandation,
+    RESUME: resumeTexte(signalement).slice(0, 3800),   // on coupe à 3800 caractères : les liens trop longs ne marchent pas
+    BRIGADE: signalement.milieu.brigade ? nomBrigade(signalement.milieu.brigade) : ""
+  };
+
+  // Séparer l'adresse en 2 : avant le « ? » et après
+  const positionPointInterrogation = lienDeBase.indexOf("?");
+  if (positionPointInterrogation < 0) {
+    return lienDeBase;
+  }
+  const debut = lienDeBase.slice(0, positionPointInterrogation + 1);
+  const morceaux = lienDeBase.slice(positionPointInterrogation + 1).split("&");
+
+  let nombreRemplaces = 0;
+  const nouveauxMorceaux = [];
+  for (const morceau of morceaux) {
+    const positionEgal = morceau.indexOf("=");
+    if (positionEgal < 0) {
+      nouveauxMorceaux.push(morceau);
+      continue;
+    }
+    const nomParametre = morceau.slice(0, positionEgal);
+    let valeurActuelle;
+    try {
+      valeurActuelle = decodeURIComponent(morceau.slice(positionEgal + 1).replaceAll("+", " "));
+    } catch (erreur) {
+      nouveauxMorceaux.push(morceau);
+      continue;
+    }
+
+    // Forms met parfois la réponse entre guillemets : "MILIEU". On garde les guillemets si c'est le cas.
+    const entreGuillemets = valeurActuelle.startsWith('"') && valeurActuelle.endsWith('"') && valeurActuelle.length >= 2;
+    let mot = valeurActuelle;
+    if (entreGuillemets) {
+      mot = valeurActuelle.slice(1, -1);
+    }
+    mot = mot.trim().toUpperCase();
+
+    if (valeurs[mot] === undefined) {
+      nouveauxMorceaux.push(morceau);   // ce n'est pas un de nos mots (ex. : id=...) : on le garde tel quel
+      continue;
+    }
+
+    nombreRemplaces = nombreRemplaces + 1;
+    let nouvelleValeur = valeurs[mot];
+    if (entreGuillemets) {
+      nouvelleValeur = '"' + nouvelleValeur + '"';
+    }
+    nouveauxMorceaux.push(nomParametre + "=" + encodeURIComponent(nouvelleValeur));
+  }
+
+  if (nombreRemplaces === 0) {
+    return lienDeBase;
+  }
+  return debut + nouveauxMorceaux.join("&");
+}
+
+
+/* ---------------------------------------------------------------------
+   3.18 BASE DE DONNÉES SUPABASE
+   ---------------------------------------------------------------------
+   Envoie le signalement dans la table Supabase avec « fetch » (une requête
+   vers un autre site). Les noms à gauche (session_id, envoye, brigade...)
+   doivent être EXACTEMENT les noms des colonnes de la table
+   (voir le fichier supabase-setup.sql).
+   « async / await » : on attend la réponse du serveur avant de continuer.
+   Pour en savoir plus :
+     https://developer.mozilla.org/fr-FR/docs/Web/API/fetch
+     https://supabase.com/docs/guides/api
+*/
+const BASE_DE_DONNEES_ACTIVE = Boolean(CONFIG.supabaseUrl && CONFIG.supabaseKey);
+
+async function enregistrerDansSupabase(signalement) {
+  const motifs = [];
+  for (const motif of signalement.recommandation.motifs) {
+    motifs.push(MOTIFS[motif].texte);
+  }
+
+  const ligne = {
+    session_id: signalement.identifiant,
+    envoye: true,
+    brigade: signalement.milieu.brigade || null,
+    milieu: signalement.milieu.nom || null,
+    type_milieu: signalement.milieu.type || null,
+    contact: signalement.milieu.contact || null,
+    telephone: signalement.milieu.tel || null,
+    age: signalement.enfant.age ? signalement.enfant.age + " " + signalement.enfant.uniteAge : null,
+    recommandation: TEXTE_COURT[signalement.recommandation.etat],
+    priorite: signalement.priorite,
+    diagnostic: signalement.diagnostic.maladie || null,
+    motifs: motifs.join(" | ") || null,
+    resume: resumeTexte(signalement),
+    donnees: signalement
+  };
+
+  // Adresse : https://xxxx.supabase.co/rest/v1/signalements
+  let adresse = CONFIG.supabaseUrl;
+  while (adresse.endsWith("/")) {
+    adresse = adresse.slice(0, -1);   // enlever un « / » à la fin s'il y en a un
+  }
+  adresse += "/rest/v1/" + encodeURIComponent(CONFIG.supabaseTable);
+
+  const reponse = await fetch(adresse, {
+    method: "POST",                                  // POST = « ajouter »
+    headers: {
+      "apikey": CONFIG.supabaseKey,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal"
+    },
+    body: JSON.stringify(ligne)                      // JSON.stringify transforme l'objet en texte
+  });
+
+  if (!reponse.ok) {
+    throw new Error("Erreur du serveur : " + reponse.status);
+  }
+}
+
+
+/* ---------------------------------------------------------------------
+   3.19 ENVOYER (clic sur « Envoyer à la brigade »)
+   ---------------------------------------------------------------------
+   Ordre :
+     1. vérifier que tout est répondu
+     2. si c'est l'exemple : ne rien envoyer
+     3. si un lien Microsoft Forms existe : ouvrir le formulaire prérempli
+     4. sinon, si Supabase est configuré : enregistrer dans la base de données
+     5. sinon : afficher le résumé à copier
+*/
+function messageEnvoye(signalement) {
+  return `<div class="boite-envoi">
+    <h3>Signalement envoyé à la brigade</h3>
+    <p>Envoyé le ${echapper(new Date(signalement.date).toLocaleString("fr-CA"))}. Suivez la recommandation ci-dessus en attendant que la brigade vous contacte au besoin.</p>
+  </div>`;
+}
+
+function contactBrigadeHtml() {
+  if (!CONFIG.contactBrigade) {
+    return "";
+  }
+  return "<p>Brigade : <b>" + echapper(CONFIG.contactBrigade) + "</b></p>";
+}
+
+// La fiche d'exemple commence toujours par « EXEMPLE » dans les notes.
+function estUnExemple(reponses) {
+  return (reponses.notes || "").startsWith("EXEMPLE");
+}
+
+formulaire.addEventListener("submit", async function (evenement) {
+  // Empêche le navigateur de recharger la page (ce qu'il fait par défaut avec un formulaire)
+  evenement.preventDefault();
+  effacerErreurs();
+
+  const etat = rafraichir();
+  const reponses = etat.reponses;
+  const decision = etat.decision;
+
+  // 1. Vérifier
+  const aCompleter = verifierReponses(reponses, decision);
+  if (aCompleter.length > 0) {
+    const zoneErreur = trouver("#message-erreur");
+    zoneErreur.hidden = false;
+    zoneErreur.textContent = "Complétez : " + aCompleter.join(", ") + ".";
+    return;   // « return » arrête la fonction ici
+  }
+
+  const signalement = creerSignalement(reponses, decision);
+
+  // 2. Exemple : on n'envoie rien
+  if (estUnExemple(reponses)) {
+    messageEnvoi = `<div class="boite-envoi"><h3>Exemple</h3><p>Ceci est une fiche d'exemple : rien n'a été envoyé ni enregistré.</p></div>`;
+    rafraichir();
+    return;
+  }
+
+  // 3. Microsoft Forms
+  const lienForms = lienFormsPrerempli(signalement);
+  if (lienForms) {
+    const nouvelOnglet = window.open(lienForms, "_blank", "noopener");
+    let phraseOnglet = "Le formulaire de la brigade s'est ouvert dans un nouvel onglet. ";
+    if (nouvelOnglet === null) {
+      phraseOnglet = "";   // le navigateur a bloqué l'onglet : le bouton ci-dessous permet de l'ouvrir
+    }
+    messageEnvoi = `<div class="boite-envoi">
+      <h3>Dernière étape : confirmez dans le formulaire</h3>
+      <p>${phraseOnglet}Toutes vos réponses y sont déjà inscrites. Vérifiez-les, puis cliquez sur <b>« Envoyer »</b> au bas du formulaire. Le signalement n'est transmis qu'à ce moment.</p>
+      <p><a class="bouton principal" style="display: inline-block; text-decoration: none" href="${echapper(lienForms)}" target="_blank" rel="noopener">Ouvrir le formulaire</a></p>
+    </div>`;
+    rafraichir();
+    trouver("#recommandation").scrollIntoView({ block: "start" });
+    return;
+  }
+
+  // 4. Supabase
+  if (BASE_DE_DONNEES_ACTIVE) {
+    const bouton = trouver("#bouton-envoyer");
+    bouton.disabled = true;
+    bouton.textContent = "Envoi…";
+    try {
+      await enregistrerDansSupabase(signalement);
+      messageEnvoi = messageEnvoye(signalement);
+    } catch (erreur) {
+      messageEnvoi = `<div class="boite-envoi">
+        <h3>Signalement non envoyé</h3>
+        <p>L'envoi n'a pas fonctionné. Vérifiez votre connexion et réessayez, ou copiez ce résumé et transmettez-le à la brigade.</p>
+        ${contactBrigadeHtml()}
+        <pre class="resume">${echapper(resumeTexte(signalement))}</pre>
+      </div>`;
+    }
+    bouton.disabled = false;
+    bouton.textContent = "Envoyer à la brigade";
+    rafraichir();
+    return;
+  }
+
+  // 5. Rien de configuré : le milieu copie le résumé
+  messageEnvoi = `<div class="boite-envoi">
+    <h3>Transmettez ce résumé à la brigade</h3>
+    ${contactBrigadeHtml()}
+    <pre class="resume">${echapper(resumeTexte(signalement))}</pre>
+  </div>`;
+  rafraichir();
+});
+
+
+/* ---------------------------------------------------------------------
+   3.20 BOUTONS « RECOMMENCER » ET « REMPLIR UN EXEMPLE »
+   --------------------------------------------------------------------- */
+
+// Recommencer : efface les réponses sur l'enfant, mais garde les coordonnées du milieu.
+trouver("#bouton-recommencer").addEventListener("click", function () {
+  const garder = {
+    type: lireReponses().type,
+    nom: formulaire.elements.nom.value,
+    contact: formulaire.elements.contact.value,
+    tel: formulaire.elements.tel.value,
+    brigade: formulaire.elements.brigade.value
+  };
+
+  formulaire.reset();   // efface tout le formulaire
+  messageEnvoi = null;
+  identifiantEvaluation = nouvelIdentifiant();
+
+  formulaire.elements.nom.value = garder.nom;
+  formulaire.elements.contact.value = garder.contact;
+  formulaire.elements.tel.value = garder.tel;
+  formulaire.elements.brigade.value = BRIGADE_DU_LIEN || garder.brigade;
+  if (garder.type) {
+    cocher("type", garder.type);
+  }
+
+  effacerErreurs();
+  rafraichir();
+  window.scrollTo({ top: 0 });
+});
+
+// Remplir un exemple : une fiche fictive pour montrer comment l'outil fonctionne.
+// L'exemple n'est jamais envoyé (voir estUnExemple).
+trouver("#bouton-exemple").addEventListener("click", function () {
+  // Petite fonction pour remplir une réponse : coche le bon bouton, ou écrit dans la zone
+  function remplir(nom, valeur) {
+    const elements = formulaire.querySelectorAll('[name="' + nom + '"]');
+    if (elements.length === 0) {
+      return;
+    }
+    if (elements[0].type === "radio") {
+      cocher(nom, valeur);
+    } else {
+      elements[0].value = valeur;
+    }
+  }
+
+  remplir("type", "CPE");
+  if (!formulaire.elements.nom.value) remplir("nom", "CPE Exemple");
+  if (!formulaire.elements.contact.value) remplir("contact", "Personne exemple");
+  if (!formulaire.elements.tel.value) remplir("tel", "000-000-0000");
+
+  remplir("age", "2");
+  remplir("uniteAge", "ans");
+  remplir("autres", "1");
+
+  remplir("lieu", "garde");
+  remplir("mesure", "oui");
+  rafraichir();
+  remplir("temp", "38.9");
+  remplir("voie", "rectum");
+  rafraichir();
+
+  remplir("ac_formulaire", "oui");
+  remplir("ac_allergie", "non");
+  remplir("ac_4h", "non");
+  remplir("ac_48h", "non");
+  remplir("ac_poids", "12.5");
+  remplir("ac_concentration", "80/5");
+  remplir("aceta", "oui");
+  remplir("temp2", "");
+
+  remplir("etat", "non");
+  remplir("vomissements", "non");
+  remplir("diarrhee", "non");
+  remplir("lesions", "non");
+  remplir("consigne", "non");
+  remplir("diagnostic", "non");
+  remplir("notes", "EXEMPLE – fiche fictive pour démonstration, ne pas envoyer.");
+
+  messageEnvoi = null;
+  effacerErreurs();
+  rafraichir();
+});
+
+
+/* ---------------------------------------------------------------------
+   3.21 DÉMARRAGE (s'exécute une fois, à l'ouverture de la page)
+   --------------------------------------------------------------------- */
+remplirListeMaladies();
+preparerChampBrigade();
+chargerMilieu();
+rafraichir();
+
+// Texte de la boîte grise qui explique l'envoi, selon les réglages
+const avis = trouver("#avis-envoi");
+let formsActive = Boolean(CONFIG.formsPrefillUrl);
+for (const brigade of BRIGADES) {
+  if (brigade.form) {
+    formsActive = true;
+  }
+}
+if (formsActive) {
+  avis.textContent = "Après avoir répondu, cliquez sur « Envoyer à la brigade » : un formulaire déjà rempli s'ouvrira. Il suffira de cliquer sur « Envoyer » au bas du formulaire. Aucun nom d'enfant n'est demandé.";
+} else if (BASE_DE_DONNEES_ACTIVE) {
+  avis.textContent = "Quand vous cliquez sur « Envoyer à la brigade », vos réponses sont enregistrées pour la santé publique. Aucun nom d'enfant n'est demandé.";
+} else {
+  let texte = "L'envoi automatique n'est pas encore activé. Après avoir répondu, copiez le résumé et transmettez-le à la brigade";
+  if (CONFIG.contactBrigade) {
+    texte += " (" + CONFIG.contactBrigade + ").";
+  } else {
+    texte += ".";
+  }
+  avis.textContent = texte;
+}
+avis.hidden = false;
+</script>
+</body>
+</html>
